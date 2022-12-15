@@ -155,6 +155,10 @@ for i in $(seq 1 $nr_iter); do
 
 		update_section_stats $s $summary
 	done
+
+	if (( $i % 10 == 0 )); then
+		dump_test_run_stats
+	fi
 done
 
 dump_test_run_stats
