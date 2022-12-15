@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # TODO: Test SIGINT
-trap "dump_test_run_stats" SIGINT 
+trap "dump_test_run_stats; exit 0" SIGINT 
 
 xunit_results=workflows/fstests/results/xunit_results.txt
 gen_results_summary=./playbooks/python/workflows/fstests/gen_results_summary
