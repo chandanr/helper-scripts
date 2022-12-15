@@ -122,24 +122,30 @@ update_section_stats()
 	done < $summary
 }
 
+if [[ $# != 2 ]]; then
+	echo "Usage: $0 <kernel version>  <iteration count>"
+	exit 1
+fi
+kernel_vers=$1
+nr_iter=$2
+
 make fstests
 if [[ $? != 0 ]]; then
 	echo "\'make fstests\' failed"
 	exit 1
 fi
 
-rm -rf .kernel-ci.*
-
-while [[ 1 ]]; do
-	make fstests-baseline-loop
+for i in $(seq 1 $nr_iter); do
+	echo "----- $i -----"
+	make fstests-baseline
 
 	grep -iq failures $xunit_results
-	[[ $? != 0 ]] && break
+	[[ $? != 0 ]] && continue
 
 	for s in ${sections[@]}; do
 		# echo "s = $s"
-		s=$(echo $s | sed s/_/-/g)
-		section_results=${results_dir}/chanbabu-${s}
+		# s=$(echo $s | sed s/_/-/g)
+		section_results=${results_dir}/${kernel_vers}/${s}
 		# echo "Processing $section_results ..."
 		$gen_results_summary --results_file result.xml --print_section \
 				     $section_results > $summary 2>/dev/null
@@ -147,7 +153,7 @@ while [[ 1 ]]; do
 		tail -n +3 $summary > $summary.tmp
 		head -n -2 $summary.tmp > $summary
 
-		update_section_stats $(echo $s | sed s/-/_/g) $summary
+		update_section_stats $s $summary
 	done
 done
 
