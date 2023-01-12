@@ -66,7 +66,7 @@ dump_section_stats()
 				;;
 
 			*)
-				echo "Invalid test case"
+				echo "dump_section_stats: Invalid section: $section"
 				exit 1
 				;;
 		esac
@@ -114,7 +114,7 @@ update_section_stats()
 				((xfs_logdev[$test_name] = ${xfs_logdev[$test_name]} + 1))
 				;;
 			*)
-				echo "Invalid case"
+				echo "update_section_stats: Invalid section $section"
 				exit 1
 				;;
 		esac
