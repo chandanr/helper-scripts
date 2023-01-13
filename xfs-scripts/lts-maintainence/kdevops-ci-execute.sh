@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# TODO: Test SIGINT
-trap "dump_test_run_stats; exit 0" SIGINT 
+# ./kdevops-ci-execute.sh 5.4.225+ 54 1000 /tmp/prev_stats.txt
+trap "echo \"Executing SIGINT trap\"; dump_test_run_stats; exit 1" SIGINT
+trap "echo \"Executing SIGUSR1 trap\"; dump_test_run_stats;" SIGUSR1
 
 xunit_results=workflows/fstests/results/xunit_results.txt
 gen_results_summary=./playbooks/python/workflows/fstests/gen_results_summary
@@ -16,6 +17,65 @@ sections=(xfs_nocrc xfs_nocrc_512 xfs_crc xfs_reflink xfs_reflink_1024
 
 test_cases=(generic/019 generic/388 generic/455 generic/457 generic/475
 	    generic/482 generic/646 generic/648 xfs/057)
+
+read_prev_stats()
+{
+	stats_file=$1
+	found_section=0
+	section=""
+
+	while read -r line; do
+		[[ -z $line ]] && continue
+
+		echo $line | grep -iq section
+		if [[ $? == 0 ]]; then
+			section=$(echo $line | awk '{ print($2) }')
+			found_section=1
+			echo "Retrieving statistics for $section"
+			continue
+		fi
+
+		if [[ $found_section == 0 ]]; then
+			echo "Section not found; Exiting"
+			exit 1
+		fi
+		
+		test_name=$(echo $line | awk '{ split($1, a, ":"); print(a[1]); }')
+		fail_count=$(echo $line | awk '{ print($5) }')
+
+		case $section in
+			"xfs_nocrc")
+				((xfs_nocrc[$test_name] = ${xfs_nocrc[$test_name]} + $fail_count))
+				;;
+			"xfs_nocrc_512")
+				((xfs_nocrc_512[$test_name] = ${xfs_nocrc_512[$test_name]} + $fail_count))
+				;;
+			"xfs_crc")
+				((xfs_crc[$test_name] = ${xfs_crc[$test_name]} + $fail_count))
+				;;
+			"xfs_reflink")
+				((xfs_reflink[$test_name] = ${xfs_reflink[$test_name]} + $fail_count))
+				;;
+			"xfs_reflink_1024")
+				((xfs_reflink_1024[$test_name] = ${xfs_reflink_1024[$test_name]} + $fail_count))
+				;;
+			"xfs_reflink_normapbt")
+				((xfs_reflink_normapbt[$test_name] = ${xfs_reflink_normapbt[$test_name]} + $fail_count))
+				;;
+			"xfs_logdev")
+				((xfs_logdev[$test_name] = ${xfs_logdev[$test_name]} + $fail_count))
+				;;
+			*)
+				echo "read_prev_stats: Invalid section $section"
+				exit 1
+				;;
+		esac
+		
+	done < $stats_file
+
+	dump_test_run_stats
+
+}
 
 dump_section_stats()
 {
@@ -122,12 +182,21 @@ update_section_stats()
 	done < $summary
 }
 
-if [[ $# != 2 ]]; then
-	echo "Usage: $0 <kernel version>  <iteration count>"
+if (( $# < 3 )); then
+	echo "Usage: $0 <kernel version> <start iteration> <iteration count> <previous stats>"
 	exit 1
 fi
+
 kernel_vers=$1
-nr_iter=$2
+start_iter=$2
+nr_iter=$3
+prev_stats=$4
+
+if [[ ! -z $prev_stats && -a $prev_stats ]]; then
+	read_prev_stats /tmp/prev_stats.txt
+else
+	echo "No previous stats to read"
+fi
 
 make fstests
 if [[ $? != 0 ]]; then
@@ -135,18 +204,15 @@ if [[ $? != 0 ]]; then
 	exit 1
 fi
 
-for i in $(seq 1 $nr_iter); do
-	echo "----- $i -----"
+for i in $(seq $start_iter $nr_iter); do
+	echo "----- ${i}/${nr_iter} -----"
 	make fstests-baseline
 
 	grep -iq failures $xunit_results
 	[[ $? != 0 ]] && continue
 
 	for s in ${sections[@]}; do
-		# echo "s = $s"
-		# s=$(echo $s | sed s/_/-/g)
 		section_results=${results_dir}/${kernel_vers}/${s}
-		# echo "Processing $section_results ..."
 		$gen_results_summary --results_file result.xml --print_section \
 				     $section_results > $summary 2>/dev/null
 
