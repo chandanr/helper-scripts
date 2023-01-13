@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # ./kdevops-ci-execute.sh 5.4.225+ 54 1000 /tmp/prev_stats.txt
-trap "echo \"Executing SIGINT trap\"; dump_test_run_stats; exit 1" SIGINT
-trap "echo \"Executing SIGUSR1 trap\"; dump_test_run_stats;" SIGUSR1
 
 xunit_results=workflows/fstests/results/xunit_results.txt
 gen_results_summary=./playbooks/python/workflows/fstests/gen_results_summary
@@ -17,6 +15,22 @@ sections=(xfs_nocrc xfs_nocrc_512 xfs_crc xfs_reflink xfs_reflink_1024
 
 test_cases=(generic/019 generic/388 generic/455 generic/457 generic/475
 	    generic/482 generic/646 generic/648 xfs/057)
+
+trap handle_sigint SIGINT
+trap handle_sigusr1 SIGUSR1
+
+handle_sigint()
+{
+	echo "Executing SIGINT trap: Iteration count = $iter_count"
+	dump_test_run_stats
+	exit 1
+}
+
+handle_sigusr1()
+{
+	echo "Executing SIGUSR1 trap: Iteration count = $iter_count"
+	dump_test_run_stats
+}
 
 read_prev_stats()
 {
@@ -206,6 +220,8 @@ fi
 
 for i in $(seq $start_iter $nr_iter); do
 	echo "----- ${i}/${nr_iter} -----"
+	iter_count=$i
+
 	make fstests-baseline
 
 	grep -iq failures $xunit_results
