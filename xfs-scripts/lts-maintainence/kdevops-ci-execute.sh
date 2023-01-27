@@ -88,7 +88,6 @@ read_prev_stats()
 	done < $stats_file
 
 	dump_test_run_stats
-
 }
 
 dump_section_stats()
@@ -207,7 +206,7 @@ nr_iter=$3
 prev_stats=$4
 
 if [[ ! -z $prev_stats && -a $prev_stats ]]; then
-	read_prev_stats /tmp/prev_stats.txt
+	read_prev_stats $prev_stats
 else
 	echo "No previous stats to read"
 fi
