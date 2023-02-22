@@ -228,8 +228,9 @@ for i in $(seq $start_iter $nr_iter); do
 
 	for s in ${sections[@]}; do
 		section_results=${results_dir}/${kernel_vers}/${s}
-		$gen_results_summary --results_file result.xml --print_section \
-				     $section_results > $summary 2>/dev/null
+		$gen_results_summary --results_file result.xml \
+				     --print_section $section_results \
+				     --verbose > $summary 2>/dev/null
 
 		tail -n +3 $summary > $summary.tmp
 		head -n -2 $summary.tmp > $summary
