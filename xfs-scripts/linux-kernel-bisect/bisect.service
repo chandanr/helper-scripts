@@ -1,0 +1,13 @@
+[Unit]
+Description=chandan-git-bisect
+After=data.mount
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=no
+User=root
+ExecStart=/data/automate/driver.sh
+
+[Install]
+WantedBy=multi-user.target
