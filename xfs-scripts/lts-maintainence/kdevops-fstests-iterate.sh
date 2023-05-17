@@ -12,6 +12,32 @@ log=$4
 
 expunges_dir=workflows/fstests/expunges/${kernel_version}/xfs/unassigned/
 
+did_copy_results_fail()
+{
+	for l in $(grep -A 7 'PLAY RECAP' $log | tail -n 7); do
+		echo $l | grep -q -i 'failed=1'
+		[[ $? == 0 ]] && return 0
+	done
+
+	return 1
+}
+
+retry_copy()
+{
+	i=0
+	while [[ 1 ]]; do
+		((i = i + 1))
+		echo "Copying results: Attempt: $i"
+		ansible-playbook -i ./hosts --extra-vars \
+				 @./extra_vars.yaml \
+				 playbooks/fstests.yml \
+				 --tags "copy_results"
+		[[ $? == 0 ]] && return 0
+	done
+
+	return 1
+}
+
 git diff --exit-code > /dev/null 2>&1
 if [[ $? == 1  ]]; then
 	echo "Repository has uncommitted changes"
@@ -21,10 +47,14 @@ fi
 for (( i = $start_iteration; i <= $end_iteration; i++ )); do
 	echo "---------- Iteration: $i ----------"
 	make fstests-baseline
-	# TODO: Retry if copying result failed
-	if [[ $? != 0  ]]; then
-		echo "make fstests-baseline failed"
-		exit 1
+	if [[ $? != 0 ]]; then
+		did_copy_results_fail
+		if [[ $? == 0 ]]; then
+			retry_copy
+		else
+			echo "make fstests-baseline failed"
+			exit 1
+		fi
 	fi
 
 	./scripts/workflows/fstests/find-common-failures.sh -l $expunges_dir
