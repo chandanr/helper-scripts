@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if (( $# != 4 )); then
-	echo "Usage: $0 <kernel-version> <start-iteration> <end-iteration> <log-file>"
+if (( $# < 5 )); then
+	echo "Usage: $0 <kernel-version> <start-iteration> <end-iteration> <log-file> <stop-iteration-file> [test list]"
 	exit 1
 fi
 
@@ -9,8 +9,23 @@ kernel_version=$1
 start_iteration=$2
 end_iteration=$3
 log=$4
+stop_iter_file=$5
+
+test_list=""
+if [[ $# == 6 ]]; then
+	test_list=" TESTS=\"$6\""
+fi
+
 
 expunges_dir=workflows/fstests/expunges/${kernel_version}/xfs/unassigned/
+
+stop_test()
+{
+	if [[ -a $stop_iter_file ]]; then
+		echo "Stop iteration file $stop_iter_file found; Exiting"
+		exit 0
+	fi
+}
 
 did_copy_results_fail()
 {
@@ -26,6 +41,8 @@ retry_copy()
 {
 	i=0
 	while [[ 1 ]]; do
+		stop_test
+
 		((i = i + 1))
 		echo "Copying results: Attempt: $i"
 		ansible-playbook -i ./hosts --extra-vars \
@@ -45,8 +62,16 @@ if [[ $? == 1  ]]; then
 fi
 
 for (( i = $start_iteration; i <= $end_iteration; i++ )); do
+	stop_test
+
 	echo "---------- Iteration: $i ----------"
-	make fstests-baseline
+
+	cmd="make fstests-baseline"
+	if [[ -n $test_list ]]; then
+		cmd=${cmd}${test_list}
+	fi
+
+	eval $cmd
 	if [[ $? != 0 ]]; then
 		did_copy_results_fail
 		if [[ $? == 0 ]]; then
