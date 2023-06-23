@@ -25,11 +25,15 @@ if [[ $? != 0 ]]; then
 	echo "Unable to execute git fetch"
 fi
 
-echo "Checking out commit: $commit_id"
-git checkout -b $git_test_branch $commit_id
-if [[ $? != 0 ]]; then
-	echo "Git checkout failed"
-fi
+# echo "Checking out commit: $commit_id"
+# git checkout -b $git_test_branch $commit_id
+# if [[ $? != 0 ]]; then
+# 	echo "Git checkout failed"
+# fi
+
+echo "Reverting commit: $commit_id"
+git show $commit_id | git apply -R
+git commit -a -m "Reverted $commit_id"
 
 echo "Build kernel"
 make -j4
@@ -53,6 +57,15 @@ dracut -f --force-drivers "vfat ext4 xfs" \
 if [[ $? != 0 ]]; then
 	echo "Unable to initramfs image"
 	exit 1
+fi
+
+echo "Build perf"
+dnf '--enablerepo=*' -y builddep perf
+make -C tools/perf/
+if [[ $? != 0 ]]; then
+	echo "Unable to build perf"
+else
+	cp tools/perf/perf /usr/local/bin/
 fi
 
 kexec -l $bzimage --initrd $initramfs --reuse-cmdline
