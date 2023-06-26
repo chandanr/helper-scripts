@@ -1,0 +1,37 @@
+#!/usr/bin/bpftrace
+
+#include "xfs-defs.h"
+
+BEGIN
+{
+	printf("Tracing xfs_buf lock/unlock events. Hit Ctrl-C to end.\n");
+}
+
+tracepoint:xfs:xfs_buf_lock
+{
+	if (args->dev == 7340037) {
+		printf("%s %d %u: xfs:xfs_buf_lock: dev %u bno 0x%x, nblks 0x%x hold %d pincount %d lock %d flags %u caller %s\n", comm, pid, nsecs, args->dev, args->bno, args->nblks, args->hold, args->pincount, args->lockval, args->flags, ksym(args->caller_ip));
+		printf("%s\n", kstack)
+	}
+}
+
+tracepoint:xfs:xfs_buf_lock_done
+{
+	if (args->dev == 7340037) {
+		printf("%s %d %u: xfs:xfs_buf_lock: dev %u bno 0x%x, nblks 0x%x hold %d pincount %d lock %d flags %u caller %s\n", comm, pid, nsecs, args->dev, args->bno, args->nblks, args->hold, args->pincount, args->lockval, args->flags, ksym(args->caller_ip));
+		printf("%s\n", kstack)
+	}
+}
+
+tracepoint:xfs:xfs_buf_unlock
+{
+	if (args->dev == 7340037) {
+		printf("%s %d %u: xfs:xfs_buf_lock: dev %u bno 0x%x, nblks 0x%x hold %d pincount %d lock %d flags %u caller %s\n", comm, pid, nsecs, args->dev, args->bno, args->nblks, args->hold, args->pincount, args->lockval, args->flags, ksym(args->caller_ip));
+		printf("%s\n", kstack)
+	}
+}
+
+END
+{
+	printf("Finished Tracing");
+}
