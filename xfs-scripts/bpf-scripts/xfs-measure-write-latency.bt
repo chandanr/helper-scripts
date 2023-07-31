@@ -1,0 +1,87 @@
+#!/usr/bin/bpftrace
+
+#include "xfs-defs.h"
+
+BEGIN
+{
+	if ($# != 2) {
+		printf("Usage: ./xfs-measure-flush-latency <disk major number> <disk minor number>\n");
+		exit();
+	}
+
+	@major = $1;
+	@minor = $2;
+	printf("Measuring XFS buffered synchronous write delay; Major = %d; Minor = %d. Hit Ctrl-C to end.\n",
+		@major, @minor);
+}
+
+kprobe:iomap_file_buffered_write
+{
+	@iomap_start[tid] = nsecs;
+}
+
+kretprobe:iomap_file_buffered_write
+{
+	if (@iomap_start[tid] == 0) {
+		printf("iomap_start: Got 0 as the start time\n");
+		return;
+	}
+
+	$diff = (nsecs - @iomap_start[tid]) / 1000000;
+	if ($diff == 0) {
+		delete(@iomap_start[tid]);
+		return;
+	}
+
+	printf("iomap_file_buffered_write delay = %d ms\n", $diff);
+
+	delete(@iomap_start[tid])
+}
+
+kprobe:xfs_file_fsync
+{
+	@xfs_file_fsync_start[tid] = nsecs;
+}
+
+kretprobe:xfs_file_fsync
+{
+	if (@xfs_file_fsync_start[tid] == 0) {
+		printf("iomap_start: Got 0 as the start time\n");
+		return;
+	}
+
+	$diff = (nsecs - @xfs_file_fsync_start[tid]) / 1000000;
+	if ($diff == 0) {
+		delete(@xfs_file_fsync_start[tid]);
+		return;
+	}
+
+	printf("xfs_file_fsync delay = %d ms\n", $diff);
+
+	delete(@xfs_file_fsync_start[tid])
+}
+
+tracepoint:xfs:xfs_ail_insert
+{
+	$tp_major = ((uint32)(args->dev)) >> 20;
+	$tp_minor = (uint32)(args->dev) & ((1U << 20) - 1);
+
+	if ($tp_major != (uint32)(@major) || $tp_minor != (uint32)(@minor)) {
+		return;
+	}
+
+	printf("dev %d:%d lip 0x%llx old lsn %d/%d new lsn %d/%d type %u flags %u\n",
+		@major, @minor,
+		((uint64)(args->lip)),
+		((int64)(args->old_lsn)>>32),
+		((int64)(args->old_lsn)),
+		((int64)(args->new_lsn)>>32),
+		((int64)(args->new_lsn)),
+		((uint32)(args->type)),
+		((uint32)(args->flags)));
+}
+
+END
+{
+	printf("Done\n");
+}
