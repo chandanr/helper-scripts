@@ -33,7 +33,7 @@ kretprobe:iomap_file_buffered_write
 		return;
 	}
 
-	printf("iomap_file_buffered_write delay = %d ms\n", $diff);
+	printf("tid = %u; iomap_file_buffered_write delay = %d ms\n", tid, $diff);
 
 	delete(@iomap_start[tid])
 }
@@ -56,7 +56,7 @@ kretprobe:xfs_file_fsync
 		return;
 	}
 
-	printf("xfs_file_fsync delay = %d ms\n", $diff);
+	printf("tid = %u; xfs_file_fsync delay = %d ms\n", tid, $diff);
 
 	delete(@xfs_file_fsync_start[tid])
 }
@@ -71,14 +71,10 @@ tracepoint:xfs:xfs_ail_insert
 	}
 
 	printf("dev %d:%d lip 0x%llx old lsn %d/%d new lsn %d/%d type %u flags %u\n",
-		@major, @minor,
-		((uint64)(args->lip)),
-		((int64)(args->old_lsn)>>32),
-		((int64)(args->old_lsn)),
-		((int64)(args->new_lsn)>>32),
-		((int64)(args->new_lsn)),
-		((uint32)(args->type)),
-		((uint32)(args->flags)));
+		@major, @minor, ((uint64)(args->lip)),
+		((int64)(args->old_lsn)>>32), ((int64)(args->old_lsn)),
+		((int64)(args->new_lsn)>>32), ((int64)(args->new_lsn)),
+		((uint32)(args->type)), ((uint32)(args->flags)));
 }
 
 END
