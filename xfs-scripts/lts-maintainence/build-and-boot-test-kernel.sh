@@ -5,73 +5,66 @@ kerneldir=${datadir}/linux-stable/
 modulesdir=${datadir}/modules/
 initramfs=${kerneldir}/initramfs.img
 bzimage=${kerneldir}/arch/x86/boot/bzImage
-git_test_branch=test-branch
 
-if [[ $# != 1 ]]; then
-	echo "Usage: $0 <commit id>"
+if [[ $# < 1 ]]; then
+	echo "Usage: ./$0 <fetch tag/commit>"
 	exit 1
 fi
-commit_id=$1
 
 rm -rf $modulesdir
 rm -rf $initramfs
 
-mkdir $modulesdir
 cd $kerneldir
 
-echo "Performing an unshallow fetch"
-git fetch --unshallow
-if [[ $? != 0 ]]; then
-	echo "Unable to execute git fetch"
-fi
+git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+git fetch --depth 1 origin $@
 
-# echo "Checking out commit: $commit_id"
-# git checkout -b $git_test_branch $commit_id
+# git fetch --unshallow
 # if [[ $? != 0 ]]; then
-# 	echo "Git checkout failed"
+#	echo "Git fetch failed"
+#	exit 1
 # fi
 
-echo "Reverting commit: $commit_id"
-git show $commit_id | git apply -R
-git commit -a -m "Reverted $commit_id"
+git checkout -b linux-v6.5-rc5 v6.5-rc5
+if [[ $? != 0 ]]; then
+	echo "Git checkout failed"
+	exit 1
+fi
+
+echo "Build kernel config"
+yes "" | make oldconfig
 
 echo "Build kernel"
-make -j4
+make -j20
 if [[ $? != 0 ]]; then
 	echo "Unable to build kernel"
 	exit 1
 fi
 
 echo "Install modules"
-make INSTALL_MOD_PATH=$modulesdir modules_install
+make INSTALL_MOD_PATH=${modulesdir} modules_install
 if [[ $? != 0 ]]; then
 	echo "Unable to install modules"
 	exit 1
 fi
 
-echo "Build initramfs"
-dracut -f --force-drivers "vfat ext4 xfs" \
-       -k ${modulesdir}/lib/modules/"$(make kernelversion)"+/ \
-       --kver="$(make kernelversion)"+ \
-       $initramfs
+kernelversion=$(ls ${modulesdir}/lib/modules/)
+
+echo "Build initramfs" 
+dracut -f --force-drivers "vfat ext4 loop" \
+       -k ${modulesdir}/lib/modules/${kernelversion}/ \
+       --kver="${kernelversion}" ${initramfs}
 if [[ $? != 0 ]]; then
-	echo "Unable to initramfs image"
+	echo "Unable to build initramfs"
 	exit 1
 fi
 
-echo "Build perf"
-dnf '--enablerepo=*' -y builddep perf
-make -C tools/perf/
+echo "Load kernel to kexec into"
+kexec -l $bzimage --initrd  $initramfs --reuse-cmdline
 if [[ $? != 0 ]]; then
-	echo "Unable to build perf"
-else
-	cp tools/perf/perf /usr/local/bin/
-fi
-
-kexec -l $bzimage --initrd $initramfs --reuse-cmdline
-if [[ $? != 0 ]]; then
-	echo "Kexec: Unable to load kernel image"
+	echo "Unable to load kernel using kexec"
 	exit 1
 fi
 
+echo "Booting into new kernel"
 systemctl kexec
