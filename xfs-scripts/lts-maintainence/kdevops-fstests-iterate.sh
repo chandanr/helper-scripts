@@ -17,7 +17,7 @@ if [[ $# == 6 ]]; then
 fi
 
 
-expunges_dir=workflows/fstests/expunges/${kernel_version}/xfs/unassigned/
+expunges_dir=$(realpath workflows/fstests/expunges/${kernel_version}/xfs/unassigned/)
 
 stop_test()
 {
