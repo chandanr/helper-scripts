@@ -33,6 +33,11 @@ if [[ $? == 1  ]]; then
 	exit 1
 fi
 
+if [[ -a $log ]]; then
+	echo "Backing up $log"
+	mv $log ${log}.backup
+fi
+
 for (( i = $start_iteration; i <= $end_iteration; i++ )); do
 	stop_test
 
