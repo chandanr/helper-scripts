@@ -7,9 +7,10 @@ initramfs=${kerneldir}/initramfs.img
 bzimage=${kerneldir}/arch/x86/boot/bzImage
 
 if [[ $# < 1 ]]; then
-	echo "Usage: ./$0 <fetch tag/commit>"
+	echo "Usage: ./$0 <Commit to be fetched>"
 	exit 1
 fi
+commit=$1
 
 rm -rf $modulesdir
 rm -rf $initramfs
@@ -17,7 +18,11 @@ rm -rf $initramfs
 cd $kerneldir
 
 git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-git fetch --depth 1 origin $@
+git fetch --depth 1 origin $commit
+
+echo "Get short commit id"
+scommit=$(git rev-parse --short $commit)
+echo "Commit = $scommit"
 
 # git fetch --unshallow
 # if [[ $? != 0 ]]; then
@@ -25,10 +30,20 @@ git fetch --depth 1 origin $@
 #	exit 1
 # fi
 
-git checkout -b linux-v6.5-rc5 v6.5-rc5
-if [[ $? != 0 ]]; then
-	echo "Git checkout failed"
-	exit 1
+branch=branch-${scommit}
+
+git rev-parse --verify $branch
+if [[ $? == 0 ]]; then
+	echo "Checking out existing branch: $branch"
+	git checkout $branch
+	git reset --hard $scommit
+else
+	echo "Creating new branch $branch"
+	git checkout -b branch-${scommit} $scommit
+	if [[ $? != 0 ]]; then
+		echo "Git checkout failed"
+		exit 1
+	fi
 fi
 
 echo "Build kernel config"
@@ -50,7 +65,7 @@ fi
 
 kernelversion=$(ls ${modulesdir}/lib/modules/)
 
-echo "Build initramfs" 
+echo "Build initramfs"
 dracut -f --force-drivers "vfat ext4 loop" \
        -k ${modulesdir}/lib/modules/${kernelversion}/ \
        --kver="${kernelversion}" ${initramfs}
