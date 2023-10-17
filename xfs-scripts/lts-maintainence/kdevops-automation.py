@@ -275,7 +275,7 @@ def execute_fstests_baseline():
 
 parser = argparse.ArgumentParser(description="Automate kdevops usage")
 parser.add_argument("-d", dest="destroy_resources",
-                    default=False,
+                    default=False, action='store_true',
                     help="Destroy previously allocated resources",
                     required=False)
 args = parser.parse_args()
