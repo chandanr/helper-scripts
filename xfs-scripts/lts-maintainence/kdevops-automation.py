@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import subprocess
+import argparse
 import psutil
 import shlex
 import shutil
@@ -8,6 +9,14 @@ import time
 import sys
 import os
 import re
+
+parser = argparse.ArgumentParser(description="Automate kdevops usage")
+parser.add_argument("-d", dest="destroy_resources",
+                    default=False,
+                    help="Destroy previously allocated resources",
+                    required=False)
+args = parser.parse_args()
+
 
 top_dir = os.getcwd()
 kdevops_config_dir = "configs/kdevops-configs/"
@@ -54,25 +63,26 @@ test_dirs = {
 }
 
 # Destroy resources
-# print("[automation] Destroying resources")
-# for td in test_dirs.keys():
-#     print(f"=> {td}")
-#     os.chdir(td)
+if args.destroy_resources:
+    print("[automation] Destroying resources")
+    for td in test_dirs.keys():
+        print(f"=> {td}")
+        os.chdir(td)
 
-#     cmdstring = "make destroy"
+        cmdstring = "make destroy"
 
-#     print(f"{td}: Destroying resources")
-#     cmd = shlex.split(cmdstring)
-#     proc = subprocess.Popen(cmd)
-#     proc.wait()
+        print(f"{td}: Destroying resources")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
 
-#     if proc.returncode < 0:
-#         print(f"\"{cmdstring}\" failed")
-#         sys.exit(1)
+        if proc.returncode < 0:
+            print(f"\"{cmdstring}\" failed")
+            sys.exit(1)
 
-#     os.chdir(top_dir)
+        os.chdir(top_dir)
 
-# sys.exit(0)
+    sys.exit(0)
 
 # Set symlink to expunge directory
 print("[automation] Creating symlinks to expunge directory")
