@@ -5,6 +5,7 @@ import argparse
 import psutil
 import shlex
 import shutil
+import stat
 import time
 import sys
 import os
@@ -15,7 +16,8 @@ kdevops_config_dir = "configs/kdevops-configs/"
 kernel_config = "configs/kernel-configs/config-kdevops"
 kenrel_revspec = "linux-v6.6-rc6"
 kernel_version = "v6.6-rc6+"
-fstests_baseline_cmd = "time kdevops-fstests-iterate.sh {} 1 {} {} ./kdevops-stop-iteration"
+kdevops_fstests_script = "kdevops-fstests-iterate.sh"
+fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./kdevops-stop-iteration"
 
 test_dirs = {
     "kdevops-all" : {
@@ -53,6 +55,16 @@ test_dirs = {
         'nr_test_iters'  : 1,
     },
 }
+
+def kdevops_dirs_exist():
+    for td in test_dirs.keys():
+        statinfo = os.stat(td)
+        if not stat.S_ISDIR(statinfo.st_mode):
+            raise Exception(f"{td} is not a directory")
+
+def kdevops_fstests_script_exists():
+    if shutil.which(kdevops_fstests_script) == None:
+        raise Exception(f"{kdevops_fstests_script} does not exist in $PATH")
 
 def destroy_resources():
     print("[automation] Destroying resources")
@@ -267,6 +279,9 @@ parser.add_argument("-d", dest="destroy_resources",
                     help="Destroy previously allocated resources",
                     required=False)
 args = parser.parse_args()
+
+kdevops_dirs_exist()
+kdevops_fstests_script_exists()
 
 if args.destroy_resources:
     destroy_resources()
