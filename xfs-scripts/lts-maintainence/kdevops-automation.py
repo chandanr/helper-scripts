@@ -7,52 +7,50 @@ import shlex
 import shutil
 import stat
 import time
+import pdb
 import sys
 import os
 import re
 
 top_dir = os.getcwd()
+kernel_revspec = "linux-v6.6-rc6"
+kernel_version = "6.6.0-rc6+"
 kdevops_config_dir = "configs/kdevops-configs/"
 kernel_config = "configs/kernel-configs/config-kdevops"
-kenrel_revspec = "linux-v6.6-rc6"
-kernel_version = "v6.6-rc6+"
+
+kdevops_remote_repo = "oracle-gitlab"
 kdevops_fstests_script = "kdevops-fstests-iterate.sh"
 fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./kdevops-stop-iteration"
 
 test_dirs = {
     "kdevops-all" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
-        'expunge_symlink_src' : None,
-        'expunge_symlink_dst' : None,
-        'nr_test_iters'  : 1,
-    },
-
-    "kdevops-dangerous-fsstress-repair" : {
-        'kdevops_branch' : "upstream-xfs-common-expunges",
-        'expunge_symlink_src' : None,
-        'expunge_symlink_dst' : None,
-        'nr_test_iters'  : 1,
-    },
-
-    "kdevops-dangerous-fsstress-scrub" : {
-        'kdevops_branch' : "upstream-xfs-common-expunges",
-        'expunge_symlink_src' : None,
-        'expunge_symlink_dst' : None,
-        'nr_test_iters'  : 1,
+        'expunges' : None,
+        'nr_test_iters'  : 12,
     },
 
     "kdevops-externaldev" : {
         'kdevops_branch' : "upstream-xfs-externaldev-expunges",
-        'expunge_symlink_src' : "6.6.0-rc3",
-        'expunge_symlink_dst' : kernel_version[1:],
-        'nr_test_iters' : 1,
+        'expunges' : { 'all.txt' : ['xfs/438', 'xfs/538'] },
+        'nr_test_iters' : 12,
+    },
+
+    "kdevops-dangerous-fsstress-repair" : {
+        'kdevops_branch' : "upstream-xfs-common-expunges",
+        'expunges' : None,
+        'nr_test_iters'  : 4,
+    },
+
+    "kdevops-dangerous-fsstress-scrub" : {
+        'kdevops_branch' : "upstream-xfs-common-expunges",
+        'expunges' : None,
+        'nr_test_iters'  : 1,
     },
 
     "kdevops-recoveryloop" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
-        'expunge_symlink_src' : None,
-        'expunge_symlink_dst' : None,
-        'nr_test_iters'  : 1,
+        'expunges' : None,
+        'nr_test_iters'  : 15,
     },
 }
 
@@ -85,22 +83,80 @@ def destroy_resources():
 
         os.chdir(top_dir)
 
-def symlink_to_expunge_directory():
+def checkout_kdevops_git_branch():
     for td in test_dirs.keys():
-        src = test_dirs[td]['expunge_symlink_src']
-        if src == None:
+        os.chdir(td)
+
+        branch = test_dirs[td]['kdevops_branch']
+
+        cmdstrings = [
+            "git reset --hard HEAD",
+            "git checkout " + branch,
+            "git reset --hard HEAD"
+        ]
+
+        for cs in cmdstrings:
+            cmd = shlex.split(cs)
+            proc = subprocess.Popen(cmd)
+            proc.wait()
+
+            if proc.returncode < 0:
+                print(f"\"{cmdstring}\" failed")
+                sys.exit(1)
+
+        os.chdir(top_dir)
+
+def setup_expunges():
+    commit_msg = 'chandan: Add expunge list'
+
+    for td in test_dirs.keys():
+        if test_dirs[td]['expunges'] == None:
             continue
-        dst = test_dirs[td]['expunge_symlink_dst']
 
-        os.chdir(td + "/workflows/fstests/expunges/")
+        os.chdir(td)
 
-        try:
-            os.symlink(src, dst)
-        except FileExistsError:
-            print(f"=> Symlink {src} already exists")
-            pass
-        finally:
-            os.chdir(top_dir)
+        cmdstring = "git log -n 1 --pretty=format:'%s'"
+        cmd = shlex.split(cmdstring)
+        subject = subprocess.check_output(cmd)
+        subject = subject.decode()
+        if subject == commit_msg:
+            cmdstring = "git reset --hard HEAD^"
+            cmd = shlex.split(cmdstring)
+            proc = subprocess.Popen(cmd)
+            proc.wait()
+
+            if proc.returncode < 0:
+                print(f"\"{cmdstring}\" failed")
+                sys.exit(1)
+
+        path = os.path.join("workflows/fstests/expunges/", kernel_version,
+                            'xfs/unassigned')
+        os.makedirs(path, exist_ok=True)
+
+        expunges = test_dirs[td]['expunges']
+        for section in expunges.keys():
+            path = os.path.join(path, section)
+            expunge_list = expunges[section]
+            with open(path, 'w') as f:
+                for test in expunge_list:
+                    f.write(test + '\n')
+
+        cmdstrings = [
+            "git add " + path,
+            "git commit -m '" + commit_msg + "'",
+            "git push " + kdevops_remote_repo + " +HEAD",
+        ]
+
+        for cs in cmdstrings:
+            cmd = shlex.split(cs)
+            proc = subprocess.Popen(cmd)
+            proc.wait()
+
+            if proc.returncode < 0:
+                print(f"\"{cmdstring}\" failed")
+                sys.exit(1)
+
+        os.chdir(top_dir)
 
 def copy_kdevops_config():
     for td in test_dirs.keys():
@@ -124,10 +180,10 @@ def set_kernel_git_tree_revspec():
             content = f.read()
             # TODO: Why is kernel_revspec mentioned twice in the .config
             content = re.sub("^CONFIG_BOOTLINUX_CUSTOM_TAG=.+$",
-                             "CONFIG_BOOTLINUX_CUSTOM_TAG=" + kenrel_revspec,
+                             "CONFIG_BOOTLINUX_CUSTOM_TAG=" + kernel_revspec,
                              content, flags = re.MULTILINE)
             content = re.sub("^CONFIG_BOOTLINUX_TREE_TAG=.+$",
-                             "CONFIG_BOOTLINUX_TREE_TAG=" + kenrel_revspec,
+                             "CONFIG_BOOTLINUX_TREE_TAG=" + kernel_revspec,
                              content, flags = re.MULTILINE)
 
         with open(config_path, "w") as f:
@@ -252,9 +308,8 @@ def execute_fstests_baseline():
         print(f"=> {td}")
         os.chdir(td)
 
-        print("chandan: cwd = {}".format(os.getcwd()))
         nr_test_iters = test_dirs[td]['nr_test_iters']
-        cmdstring = fstests_baseline_cmd.format(kernel_version[1:], nr_test_iters,
+        cmdstring = fstests_baseline_cmd.format(kernel_version, nr_test_iters,
                                                 "./" + td + ".log")
         print(f"{td}: Started fstests-baseline loop")
         print(f"cmdstring = {cmdstring}")
@@ -274,8 +329,8 @@ def execute_fstests_baseline():
             sys.exit(1)
 
 parser = argparse.ArgumentParser(description="Automate kdevops usage")
-parser.add_argument("-d", dest="destroy_resources",
-                    default=False, action='store_true',
+parser.add_argument("-d", dest="destroy_resources", default=False,
+                    action='store_true',
                     help="Destroy previously allocated resources",
                     required=False)
 args = parser.parse_args()
@@ -287,8 +342,11 @@ if args.destroy_resources:
     destroy_resources()
     sys.exit(0)
 
-print("[automation] Creating symlinks to expunge directory")
-symlink_to_expunge_directory()
+print("[automation] Checkout kdevops git branch")
+checkout_kdevops_git_branch()
+
+print("[automation] Create expunge list")
+setup_expunges()
 
 print("[automation] Copy kdevops config")
 copy_kdevops_config()
