@@ -173,6 +173,29 @@ def copy_kernel_build_config():
         shutil.copy(kernel_config,
                     td + "/playbooks/roles/bootlinux/templates/")
 
+def set_quota_mount_options(quota_opts):
+    for td in test_dirs.keys():
+        config_path = td + "/.config"
+        with open(config_path, "r") as f:
+            content = f.read()
+
+            if 'CONFIG_FSTESTS_XFS_QUOTA_ENABLED' in content:
+                content = re.sub("^CONFIG_FSTESTS_XFS_QUOTA_ENABLED=.+$",
+                                 "", content, flags = re.MULTILINE)
+            if 'CONFIG_FSTESTS_XFS_MOUNT_QUOTA_OPTS' in content:
+                content = re.sub("^CONFIG_FSTESTS_XFS_MOUNT_QUOTA_OPTS=.+$",
+                                 "", content, flags = re.MULTILINE)
+
+            if len(quota_opts) > 0:
+                content = content + '\n' + 'CONFIG_FSTESTS_XFS_QUOTA_ENABLED=y\n'
+                content = content + '\n' + \
+                    'CONFIG_FSTESTS_XFS_MOUNT_QUOTA_OPTS=' + '"' + \
+                    quota_opts + '"' + '\n'
+
+        with open(config_path, "w") as f:
+            f.write(content)
+
+
 def set_kernel_git_tree_revspec():
     for td in test_dirs.keys():
         config_path = td + "/.config"
@@ -333,6 +356,10 @@ parser.add_argument("-d", dest="destroy_resources", default=False,
                     action='store_true',
                     help="Destroy previously allocated resources",
                     required=False)
+parser.add_argument("-q", dest="quota_opts", default="usrquota,grpquota,prjquota",
+                    action='store',
+                    help="Quota options to be passed during mount",
+                    required=False)
 args = parser.parse_args()
 
 kdevops_dirs_exist()
@@ -353,6 +380,9 @@ copy_kdevops_config()
 
 print("[automation] Copy kernel build config")
 copy_kernel_build_config()
+
+print("[automation] Set up quota mount options")
+set_quota_mount_options(args.quota_opts)
 
 print("[automation] Set kernel git tree revspec")
 set_kernel_git_tree_revspec()
