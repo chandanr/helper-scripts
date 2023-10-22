@@ -92,7 +92,7 @@ def checkout_kdevops_git_branch():
         cmdstrings = [
             "git reset --hard HEAD",
             "git checkout " + branch,
-            "git reset --hard HEAD"
+            "git reset --hard " + kdevops_remote_repo + "/" + branch
         ]
 
         for cs in cmdstrings:
