@@ -13,8 +13,8 @@ import os
 import re
 
 top_dir = os.getcwd()
-kernel_revspec = "linux-v6.6-rc6"
-kernel_version = "6.6.0-rc6+"
+kernel_revspec = "xfs-6.7-mergeA"
+kernel_version = "6.6.0-rc7+"
 kdevops_config_dir = "configs/kdevops-configs/"
 kernel_config = "configs/kernel-configs/config-kdevops"
 
@@ -31,7 +31,7 @@ test_dirs = {
 
     "kdevops-externaldev" : {
         'kdevops_branch' : "upstream-xfs-externaldev-expunges",
-        'expunges' : { 'all.txt' : ['xfs/438', 'xfs/538'] },
+        'expunges' : { 'all.txt' : ['xfs/538'] },
         'nr_test_iters' : 12,
     },
 
@@ -44,7 +44,7 @@ test_dirs = {
     "kdevops-dangerous-fsstress-scrub" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
         'expunges' : None,
-        'nr_test_iters'  : 1,
+        'nr_test_iters'  : 2,
     },
 
     "kdevops-recoveryloop" : {
@@ -65,7 +65,6 @@ def kdevops_fstests_script_exists():
         raise Exception(f"{kdevops_fstests_script} does not exist in $PATH")
 
 def destroy_resources():
-    print("[automation] Destroying resources")
     for td in test_dirs.keys():
         print(f"=> {td}")
         os.chdir(td)
@@ -80,6 +79,19 @@ def destroy_resources():
         if proc.returncode < 0:
             print(f"\"{cmdstring}\" failed")
             sys.exit(1)
+
+        os.chdir(top_dir)
+
+def print_repo_status():
+    for td in test_dirs.keys():
+        print(f"=> {td}")
+        os.chdir(td)
+
+        cmdstring = 'git --no-pager log -n 1 --pretty=format:"%H\t%ar%n"'
+        cmd = shlex.split(cmdstring)
+        commit = subprocess.check_output(cmd)
+        commit = commit.decode()
+        print(f"\t {commit}")
 
         os.chdir(top_dir)
 
@@ -351,56 +363,77 @@ def execute_fstests_baseline():
             print(f"{td}: fstests-baseline loop failed")
             sys.exit(1)
 
+def execute_tests():
+    print("[automation] Checkout kdevops git branch")
+    checkout_kdevops_git_branch()
+
+    print("[automation] Create expunge list")
+    setup_expunges()
+
+    print("[automation] Copy kdevops config")
+    copy_kdevops_config()
+
+    print("[automation] Copy kernel build config")
+    copy_kernel_build_config()
+
+    print("[automation] Set up quota mount options")
+    set_quota_mount_options(args.quota_opts)
+
+    print("[automation] Set kernel git tree revspec")
+    set_kernel_git_tree_revspec()
+
+    print("[automation] Set kdevops git tree custom tag")
+    set_kdevops_git_tree_custom_tag()
+
+    print("[automation] Build kdevops")
+    build_kdevops()
+
+    print("[automation] Bring up cloud instances")
+    bringup_cloud_instances()
+
+    print("[automation] Build Linux kernel")
+    build_linux_kernel()
+
+    print("[automation] Build and install fstests")
+    build_and_install_fstests()
+
+    print("[automation] Execute fstests-baseline")
+    execute_fstests_baseline()
+
+
 parser = argparse.ArgumentParser(description="Automate kdevops usage")
-parser.add_argument("-d", dest="destroy_resources", default=False,
+
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-d", dest="destroy_resources", default=False,
                     action='store_true',
                     help="Destroy previously allocated resources",
                     required=False)
+group.add_argument("-r", dest="print_repo_status", default=False,
+                    action='store_true',
+                    help="Print kdevops repository status",
+                    required=False)
+group.add_argument("-t", dest="execute_tests", default=False,
+                   action='store_true',
+                   help="Execute fstests",
+                   required=False)
+
 parser.add_argument("-q", dest="quota_opts", default="usrquota,grpquota,prjquota",
                     action='store',
                     help="Quota options to be passed during mount",
                     required=False)
+
 args = parser.parse_args()
 
 kdevops_dirs_exist()
 kdevops_fstests_script_exists()
 
 if args.destroy_resources:
+    print("[automation] Destroying resources")
     destroy_resources()
-    sys.exit(0)
-
-print("[automation] Checkout kdevops git branch")
-checkout_kdevops_git_branch()
-
-print("[automation] Create expunge list")
-setup_expunges()
-
-print("[automation] Copy kdevops config")
-copy_kdevops_config()
-
-print("[automation] Copy kernel build config")
-copy_kernel_build_config()
-
-print("[automation] Set up quota mount options")
-set_quota_mount_options(args.quota_opts)
-
-print("[automation] Set kernel git tree revspec")
-set_kernel_git_tree_revspec()
-
-print("[automation] Set kdevops git tree custom tag")
-set_kdevops_git_tree_custom_tag()
-
-print("[automation] Build kdevops")
-build_kdevops()
-
-print("[automation] Bring up cloud instances")
-bringup_cloud_instances()
-
-print("[automation] Build Linux kernel")
-build_linux_kernel()
-
-print("[automation] Build and install fstests")
-build_and_install_fstests()
-
-print("[automation] Execute fstests-baseline")
-execute_fstests_baseline()
+elif args.print_repo_status:
+    print("[automation] Print repository status")
+    print_repo_status()
+elif args.execute_tests:
+    execute_tests()
+else:
+    print("[automation] Nothing to do")
