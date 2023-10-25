@@ -20,7 +20,8 @@ kernel_config = "configs/kernel-configs/config-kdevops"
 
 kdevops_remote_repo = "oracle-gitlab"
 kdevops_fstests_script = "kdevops-fstests-iterate.sh"
-fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./kdevops-stop-iteration"
+kdevops_stop_iteration_file = "kdevops-stop-iteration"
+fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
 
 test_dirs = {
     "kdevops-all" : {
@@ -92,6 +93,20 @@ def print_repo_status():
         commit = subprocess.check_output(cmd)
         commit = commit.decode()
         print(f"\t {commit}")
+
+        os.chdir(top_dir)
+
+def toggle_stop_iter_file():
+    for td in test_dirs.keys():
+        print(f"=> {td}")
+
+        os.chdir(td)
+
+        if os.path.exists(kdevops_stop_iteration_file):
+            os.remove(kdevops_stop_iteration_file)
+        else:
+            with open(kdevops_stop_iteration_file, "w") as fp:
+                pass
 
         os.chdir(top_dir)
 
@@ -345,7 +360,8 @@ def execute_fstests_baseline():
 
         nr_test_iters = test_dirs[td]['nr_test_iters']
         cmdstring = fstests_baseline_cmd.format(kernel_version, nr_test_iters,
-                                                "./" + td + ".log")
+                                                "./" + td + ".log",
+                                                kdevops_stop_iteration_file)
         print(f"{td}: Started fstests-baseline loop")
         print(f"cmdstring = {cmdstring}")
         cmd = shlex.split(cmdstring)
@@ -412,6 +428,10 @@ group.add_argument("-r", dest="print_repo_status", default=False,
                     action='store_true',
                     help="Print kdevops repository status",
                     required=False)
+group.add_argument("-s", dest="toggle_stop_iter_file", default=False,
+                   action='store_true',
+                   help="Toggle stop iteration file",
+                   required=False)
 group.add_argument("-t", dest="execute_tests", default=False,
                    action='store_true',
                    help="Execute fstests",
@@ -433,6 +453,9 @@ if args.destroy_resources:
 elif args.print_repo_status:
     print("[automation] Print repository status")
     print_repo_status()
+elif args.toggle_stop_iter_file:
+    print("[automation] Toggle stop iteration file")
+    toggle_stop_iter_file()
 elif args.execute_tests:
     execute_tests()
 else:
