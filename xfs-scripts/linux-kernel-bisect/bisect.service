@@ -1,5 +1,5 @@
 [Unit]
-Description=chandan-git-bisect
+Description=git-bisect
 After=data.mount
 StartLimitIntervalSec=0
 
@@ -7,6 +7,7 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=no
 User=root
+WorkingDirectory=/data/automate/
 ExecStart=/data/automate/driver.sh
 
 [Install]

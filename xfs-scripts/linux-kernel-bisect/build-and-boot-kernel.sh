@@ -1,12 +1,20 @@
 #!/bin/bash
 
-datadir=/data/
-kerneldir=${datadir}/linux-v5.19/
+source local.config
+
 modulesdir=${datadir}/modules/
 initramfs=${kerneldir}/initramfs.img
 bzimage=${kerneldir}/arch/x86/boot/bzImage
-patches_dir=/data/automate/patches/
-patched_kernel=0
+
+if [[ -d ${modulesdir}/lib/modules/ ]]; then
+    kernelversion=$(ls ${modulesdir}/lib/modules/)
+    symlink="/lib/modules/${kernelversion}"
+    if [[ -h $symlink ]]; then
+	echo "Removing symbolic link $symlink"
+	rm -rf $symlink
+	[[ -h $symlink ]] && echo "Warning: symlink still exists"
+    fi
+fi
 
 rm -rf $modulesdir
 rm -rf $initramfs
@@ -19,21 +27,8 @@ yes "" | make oldconfig
 echo "Build kernel"
 make -j20
 if [[ $? != 0 ]]; then
-    echo "Try to build kernel after applying patch"
-    for p in $(ls -1 $patches_dir); do
-	patch -p1 < ${patches_dir}/${p}
-	if [[ $? != 0 ]]; then
-	    echo "Unable to patch kernel"
-	    exit 1
-	fi
-    done
-
-    patched_kernel=1
-    make -j20
-    if [[ $? != 0 ]]; then
-	echo "Unable to build patched kernel"
-	exit 1
-    fi
+    echo "Unable to build kernel"
+    exit 1
 fi
 
 echo "Install modules"
@@ -44,20 +39,26 @@ if [[ $? != 0 ]]; then
 fi
 
 kernelversion=$(ls ${modulesdir}/lib/modules/)
+symlink="/lib/modules/${kernelversion}"
+
+if [[ -h $symlink ]]; then
+    echo "Removing symbolic link $symlink"
+    rm -rf $symlink
+    [[ -h $symlink ]] && echo "Warning: symlink still exists"
+fi
+
+ln -s ${modulesdir}/lib/modules/${kernelversion} /lib/modules/${kernelversion}
+
+echo "Contents of /lib/modules/${kernelversion}"
+ls -lh /lib/modules/${kernelversion}
 
 echo "Build initramfs" 
-dracut -f --force-drivers "vfat ext4" \
+dracut -f --force-drivers "vfat ext4 loop dm_flakey" \
        -k ${modulesdir}/lib/modules/${kernelversion}/ \
        --kver="${kernelversion}" ${initramfs}
 if [[ $? != 0 ]]; then
     echo "Unable to build initramfs"
     exit 1
-fi
-
-if [[ $patched_kernel == 1 ]]; then
-    echo "Reseting patched kernel sources"
-    cd $kerneldir
-    git reset --hard HEAD
 fi
 
 echo "Load kernel to kexec into"

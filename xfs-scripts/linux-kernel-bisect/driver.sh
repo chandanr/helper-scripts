@@ -1,10 +1,10 @@
 #!/bin/bash
 
-logfile=/data/automate/bisect.log
+source local.config
 
-/data/automate/eval-performance.sh >> $logfile 2>&1
+${scripts_dir}/eval-performance.sh >> $logfile 2>&1
 if [[ $? != 0 ]]; then
     exit 1
 fi
 
-/data/automate/build-and-boot-kernel.sh >> $logfile 2>&1
+${scripts_dir}/build-and-boot-kernel.sh >> $logfile 2>&1
