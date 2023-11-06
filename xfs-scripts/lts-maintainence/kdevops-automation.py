@@ -193,7 +193,8 @@ def copy_kdevops_config():
             print(f'{src}: kdevops config file does not exist')
             exit(1)
 
-        shutil.copy(src, td + ".config")
+        dst = os.path.join(td, ".config")
+        shutil.copy(src, dst)
 
 def copy_kernel_build_config():
     for td in test_dirs.keys():
