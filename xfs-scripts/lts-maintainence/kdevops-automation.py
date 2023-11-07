@@ -14,7 +14,6 @@ import re
 
 top_dir = os.getcwd()
 kernel_revspec = "xfs-6.7-mergeA"
-kernel_version = "6.6.0-rc7+"
 kdevops_config_dir = "configs/kdevops-configs/"
 kernel_config = "configs/kernel-configs/config-kdevops"
 
@@ -133,7 +132,7 @@ def checkout_kdevops_git_branch():
 
         os.chdir(top_dir)
 
-def setup_expunges():
+def setup_expunges(kernel_version):
     commit_msg = 'chandan: Add expunge list'
 
     for td in test_dirs.keys():
@@ -339,6 +338,37 @@ def build_linux_kernel():
             print(f"{td}: Building Linux kernel failed")
             sys.exit(1)
 
+def get_kernel_version():
+    kernel = ""
+
+    for td in test_dirs.keys():
+        os.chdir(td)
+
+        cmdstring = ("ansible -i ./hosts --become-user root --become-method "
+                     "sudo --become all -m command -a 'uname -r' ")
+
+        print(f"{td}: Obtaining kernel version")
+        cmd = shlex.split(cmdstring)
+        vl = subprocess.check_output(cmd).decode()
+        vl = vl.strip().split('\n')
+
+        hosts = [ vl[i].split()[0] for i in range(len(vl)) if  i % 2 == 0 ]
+        kvers = [ vl[i] for i in range(len(vl)) if i % 2 != 0 ]
+
+        if kernel == "":
+            kernel = kvers[0]
+
+        for i in range(len(kvers)):
+            if kvers[i] != kernel:
+                print(f"Host: {hosts[i]} has booted into an invalid kernel "
+                      "version: {kvers[i]}")
+                sys.exit(1)
+
+        os.chdir(top_dir)
+
+    return kernel
+
+
 def build_and_install_fstests():
     for td in test_dirs.keys():
         os.chdir(td)
@@ -354,7 +384,7 @@ def build_and_install_fstests():
 
         os.chdir(top_dir)
 
-def execute_fstests_baseline():
+def execute_fstests_baseline(kernel_version):
     for td in test_dirs.keys():
         print(f"=> {td}")
         os.chdir(td)
@@ -384,9 +414,6 @@ def execute_tests():
     print("[automation] Checkout kdevops git branch")
     checkout_kdevops_git_branch()
 
-    print("[automation] Create expunge list")
-    setup_expunges()
-
     print("[automation] Copy kdevops config")
     copy_kdevops_config()
 
@@ -411,11 +438,19 @@ def execute_tests():
     print("[automation] Build Linux kernel")
     build_linux_kernel()
 
+    print("[automation] Obtain kernel version")
+    kernel_version = get_kernel_version()
+
+    print(f"[automation] Using kernel {kernel_version}")
+
+    print("[automation] Create expunge list")
+    setup_expunges(kernel_version)
+
     print("[automation] Build and install fstests")
     build_and_install_fstests()
 
     print("[automation] Execute fstests-baseline")
-    execute_fstests_baseline()
+    execute_fstests_baseline(kernel_version)
 
 
 parser = argparse.ArgumentParser(description="Automate kdevops usage")
