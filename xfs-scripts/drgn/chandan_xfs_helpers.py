@@ -3,6 +3,11 @@ from drgn import NULL, Object, cast, container_of, execscript, offsetof, reinter
 from drgn.helpers.common import *
 from drgn.helpers.linux import *
 
+def print_task_trace(prog, pid):
+    task = find_task(prog, pid)
+    trace = prog.stack_trace(task)
+    print(f"{trace}")
+
 def xfs_task_to_buf_lock_owner_pid(prog, pid):
     task = find_task(prog, pid)
     trace = prog.stack_trace(task)
