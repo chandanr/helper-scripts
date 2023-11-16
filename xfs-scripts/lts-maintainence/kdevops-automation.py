@@ -18,6 +18,7 @@ kdevops_config_dir = "configs/kdevops-configs/"
 kernel_config = "configs/kernel-configs/config-kdevops"
 
 kdevops_remote_repo = "oracle-gitlab"
+remote_kernel_dir="/data/linux-stable"
 kdevops_fstests_script = "kdevops-fstests-iterate.sh"
 kdevops_stop_iteration_file = "kdevops-stop-iteration"
 fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
@@ -338,6 +339,43 @@ def build_linux_kernel():
             print(f"{td}: Building Linux kernel failed")
             sys.exit(1)
 
+def verify_kernel_head_commit():
+    sha1 = ""
+    subject = ""
+
+    cmdstring = ("ansible -i ./hosts --become-user root --become-method "
+                 "sudo --become all -m shell -a "
+                 f"'cd {remote_kernel_dir}; "
+                 "git --no-pager log -n 1 --pretty=format:\"%h %s%n\"'")
+
+    for td in test_dirs.keys():
+        os.chdir(td)
+
+        print(f"{td}: Obtaining Linux HEAD commit")
+        cmd = shlex.split(cmdstring)
+        cl = subprocess.check_output(cmd).decode()
+        cl = cl.strip().split('\n')
+
+        hosts = [ cl[i].split()[0] for i in range(len(cl)) if  i % 2 == 0 ]
+        commits = [ cl[i] for i in range(len(cl)) if i % 2 != 0 ]
+
+        if sha1 == "" or subject == "":
+            sha1 = commits[0].split(' ', 1)[0]
+            subject = commits[0].split(' ', 1)[1]
+
+        for i in range(len(commits)):
+            csha1 = commits[i].split(' ', 1)[0]
+            csubject = commits[i].split(' ', 1)[1]
+            if csha1 != sha1 or csubject != subject:
+                print(f"Host: {hosts[i]} has an invalid kernel head commit")
+                print(f"\tExpected: SHA1 = {sha1}; SUBJECT = {subject}")
+                print(f"\tGot: SHA1 = {csha1}; SUBJECT = {csubject}")
+                sys.exit(1)
+
+        os.chdir(top_dir)
+
+    return (sha1, subject)
+
 def get_kernel_version():
     kernel = ""
 
@@ -437,6 +475,10 @@ def execute_tests():
 
     print("[automation] Build Linux kernel")
     build_linux_kernel()
+
+    print("[automation] Verify kernel HEAD commit")
+    sha1, subject = verify_kernel_head_commit()
+    print(f"Linux kernel HEAD commit: SHA1 = {sha1}; SUBJECT = {subject}")
 
     print("[automation] Obtain kernel version")
     kernel_version = get_kernel_version()
