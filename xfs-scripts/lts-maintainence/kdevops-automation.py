@@ -5,6 +5,7 @@ import argparse
 import psutil
 import shlex
 import shutil
+import glob
 import stat
 import time
 import pdb
@@ -80,6 +81,29 @@ def destroy_resources():
         if proc.returncode < 0:
             print(f"\"{cmdstring}\" failed")
             sys.exit(1)
+
+        os.chdir(top_dir)
+
+# Example invocation
+# ./kdevops-automation.py -f "6.7.0-rc2+" | grep -o -E '(xfs|generic)\/[0-9]+' | sort | uniq | grep -v -f <(cat ~/junk/known-test-failures.txt | grep -o -E '(xfs|generic)\/[0-9]+' | sort | uniq)
+def print_fail_tests_list(kernel_version):
+    for td in test_dirs.keys():
+        print(f"=> {td}")
+        os.chdir(td)
+
+        path = os.path.join("workflows/fstests/expunges/", kernel_version,
+                            "xfs/unassigned")
+        if not os.path.exists(path):
+            print(f"{path} does not exist")
+            sys.exit(1)
+
+        for f in glob.glob(path + "/*.txt"):
+            if os.stat(f).st_size == 0:
+                continue
+            print(f"-- {f}")
+            with open(f, "r") as fp:
+                for line in fp:
+                    print(f"\t{line}", end="")
 
         os.chdir(top_dir)
 
@@ -502,6 +526,9 @@ group.add_argument("-d", dest="destroy_resources", default=False,
                     action='store_true',
                     help="Destroy previously allocated resources",
                     required=False)
+group.add_argument("-f", dest="fail_kernel_version", action='store', default=None,
+                    help="Print a list of failed tests for a kernel",
+                    required=False)
 group.add_argument("-r", dest="print_repo_status", default=False,
                     action='store_true',
                     help="Print kdevops repository status",
@@ -528,6 +555,9 @@ kdevops_fstests_script_exists()
 if args.destroy_resources:
     print("[automation] Destroying resources")
     destroy_resources()
+elif args.fail_kernel_version != None:
+    print(f"[automation] Print test fail list for {args.fail_kernel_version}")
+    print_fail_tests_list(args.fail_kernel_version)
 elif args.print_repo_status:
     print("[automation] Print repository status")
     print_repo_status()
