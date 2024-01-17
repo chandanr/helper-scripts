@@ -107,6 +107,37 @@ def print_fail_tests_list(kernel_version):
 
         os.chdir(top_dir)
 
+def print_skipped_tests_list(kernel_version):
+    for td in test_dirs.keys():
+        print(f"=> {td}")
+        os.chdir(td)
+
+        path = os.path.join("workflows/fstests/results/", kernel_version)
+        for entry in os.listdir(path):
+            entry = os.path.join(path, entry)
+            if not os.path.isdir(entry):
+                continue
+
+            print(f"\tSection - {os.path.basename(entry)}")
+
+            result_xml = os.path.join(entry, "result.xml")
+            with open(result_xml, "r") as fp:
+                xml = fp.read()
+
+            search_re = '<testcase.*\n.*<skipped.*'
+            skip_start = 0
+            while True:
+                match = re.search(search_re, xml[skip_start:], re.MULTILINE)
+                if match == None:
+                    break
+
+                skipped_test = xml[skip_start + match.start():skip_start + match.end()]
+                print(f'\t\t{skipped_test}')
+
+                skip_start = skip_start + match.end() + 1
+
+        os.chdir(top_dir)
+
 def print_repo_status():
     for td in test_dirs.keys():
         print(f"=> {td}")
@@ -529,6 +560,9 @@ group.add_argument("-d", dest="destroy_resources", default=False,
 group.add_argument("-f", dest="fail_kernel_version", action='store', default=None,
                     help="Print a list of failed tests for a kernel",
                     required=False)
+group.add_argument("-o", dest="skipped_kernel_version", action='store', default=None,
+                    help="Print tests which were skipped",
+                    required=False)
 group.add_argument("-r", dest="print_repo_status", default=False,
                     action='store_true',
                     help="Print kdevops repository status",
@@ -558,6 +592,9 @@ if args.destroy_resources:
 elif args.fail_kernel_version != None:
     print(f"[automation] Print test fail list for {args.fail_kernel_version}")
     print_fail_tests_list(args.fail_kernel_version)
+elif args.skipped_kernel_version != None:
+    print(f"[automation] Print skipped test list for {args.skipped_kernel_version}")
+    print_skipped_tests_list(args.skipped_kernel_version)
 elif args.print_repo_status:
     print("[automation] Print repository status")
     print_repo_status()
