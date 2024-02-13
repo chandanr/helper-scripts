@@ -39,7 +39,7 @@ for d in $(ls -1 ${test_results_dir1}); do
 		echo "$line" | awk '{ print $1; }' >> /tmp/test-list.log
 	done
 
-	cat $check1 | while read -r line; do
+	cat $check2 | while read -r line; do
 		echo "$line" | awk '{ print $1; }' >> /tmp/test-list.log
 	done
 
