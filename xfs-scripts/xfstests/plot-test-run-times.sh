@@ -35,7 +35,7 @@ for d in $(ls -1 ${test_results_dir1}); do
 	rm -f /tmp/test-list.log
 
 	rm -f /tmp/first.log
-	rm -f /tmp/second.log	
+	rm -f /tmp/second.log
 	rm -f /tmp/merge.log
 
 	cat $check1 | while read -r line; do
@@ -57,7 +57,7 @@ for d in $(ls -1 ${test_results_dir1}); do
 			echo "1: skipping test $test"
 			continue
 		fi
-		
+
 		time=$(echo "$line" | awk '{ print $2; }')
 		echo "$i $test $time" >> /tmp/first.log
 		((i = i + 1))
@@ -74,17 +74,18 @@ for d in $(ls -1 ${test_results_dir1}); do
 		time=$(echo "$line" | awk '{ print $2; }')
 		echo " $time" >> /tmp/second.log
 	done
+
 	paste /tmp/first.log /tmp/second.log > /tmp/merge.log
 
 	gnuplot <<- EOF
-    	set terminal pngcairo enhanced size 1916,1012
-	set output "${graphs_dir}/${d}.png"
+	set terminal pngcairo enhanced size 1916,1012
+	set output "${graphs_dir}/${d}-graph.png"
 
-    	set xlabel "Test"
-    	set ylabel "Time"
+	set xlabel "Test"
+	set ylabel "Time"
 
-    	set xtic auto
-    	set ytic auto
+	set xtic auto
+	set ytic auto
 
 	set title "$d"
 	plot "/tmp/merge.log" using 1:3 title "${kernel_version_1}" with lines, "/tmp/merge.log" using 1:4 title "${kernel_version_2}" with lines
