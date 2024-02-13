@@ -17,6 +17,9 @@ graphs_dir=$3
 [[ ! -d $test_results_dir1 ]] && usage
 [[ ! -d $test_results_dir2 ]] && usage
 
+kernel_version_1=$(basename $test_results_dir1)
+kernel_version_2=$(basename $test_results_dir2)
+
 for d in $(ls -1 ${test_results_dir1}); do
 	dir1=${test_results_dir1}/${d}
 	dir2=${test_results_dir2}/${d}
@@ -84,6 +87,6 @@ for d in $(ls -1 ${test_results_dir1}); do
     	set ytic auto
 
 	set title "$d"
-    	plot "/tmp/merge.log" using 1:3 title "5.4.240+" with lines, "/tmp/merge.log" using 1:4 title "5.4.243+" with lines
+	plot "/tmp/merge.log" using 1:3 title "${kernel_version_1}" with lines, "/tmp/merge.log" using 1:4 title "${kernel_version_2}" with lines
 	EOF
 done
