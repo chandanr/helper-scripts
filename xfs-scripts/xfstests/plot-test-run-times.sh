@@ -50,32 +50,21 @@ for d in $(ls -1 ${test_results_dir1}); do
 	mv /tmp/tmp-list.log /tmp/test-list.log
 
 	i=0
-	cat $check1 | while read -r line; do
-		test=$(echo "$line" | awk '{ print $1; }')
-		cat /tmp/test-list.log | grep -q $test
-		if [[ $? != 0 ]]; then
-			echo "1: skipping test $test"
-			continue
-		fi
+	cat /tmp/test-list.log | while read -r test_nr; do
+		check_time1=$(grep $test_nr $check1)
+		[[ $? != 0 ]] && continue
 
-		time=$(echo "$line" | awk '{ print $2; }')
-		echo "$i $test $time" >> /tmp/first.log
+		check_time2=$(grep $test_nr $check2)
+		[[ $? != 0 ]] && continue
+
+		check_time1=$(echo $check_time1 | awk '{ print $2; }')
+		check_time2=$(echo $check_time2 | awk '{ print $2; }')
+
+		echo "$i $test_nr $check_time1 $check_time2" >> /tmp/merge.log
 		((i = i + 1))
 	done
 
-	cat $check2 | while read -r line; do
-		test=$(echo "$line" | awk '{ print $1; }')
-		cat /tmp/test-list.log | grep -q $test
-		if [[ $? != 0 ]]; then
-			echo "2: skipping test $test"
-			continue
-		fi
-
-		time=$(echo "$line" | awk '{ print $2; }')
-		echo " $time" >> /tmp/second.log
 	done
-
-	paste /tmp/first.log /tmp/second.log > /tmp/merge.log
 
 	gnuplot <<- EOF
 	set terminal pngcairo enhanced size 1916,1012
