@@ -64,16 +64,41 @@ for d in $(ls -1 ${test_results_dir1}); do
 		((i = i + 1))
 	done
 
+	xaxis="("
+	cat /tmp/merge.log | while read -r line; do
+		serial_nr=$(echo $line | awk '{ print $1; }')
+		test_nr=$(echo $line | awk '{ print $2; }')
+		group=$(echo $test_nr | awk -F '/' '{ print $1; }')
+		nr=$(echo $test_nr | awk -F '/' '{ print $2; }')
+
+		case $group in
+			generic)
+				test_nr=g${nr}
+				;;
+			shared)
+				test_nr=s${nr}
+				;;
+			xfs)
+				test_nr=x${nr}
+				;;
+			*)
+				echo "Invalid group: $group; test_nr: $test_nr; line = $line"
+				exit 1
+				;;
+		esac
+		xaxis="${xaxis}\"${test_nr}\" $serial_nr, "
 	done
+	xaxis="${xaxis})"
+	# echo "xaxis = $xaxis"
 
 	gnuplot <<- EOF
-	set terminal pngcairo enhanced size 1916,1012
+	set terminal pngcairo enhanced size 30000,1012
 	set output "${graphs_dir}/${d}-graph.png"
 
 	set xlabel "Test"
 	set ylabel "Time"
 
-	set xtic auto
+	set xtics ${xaxis}
 	set ytic auto
 
 	set title "$d"
