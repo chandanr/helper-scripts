@@ -53,7 +53,7 @@ echo "Contents of /lib/modules/${kernelversion}"
 ls -lh /lib/modules/${kernelversion}
 
 echo "Build initramfs" 
-dracut -f --force-drivers "vfat ext4 loop dm_flakey" \
+dracut -f --force-drivers "vfat ext4 loop dm_flakey dm_log_writes dm_thin_pool" \
        -k ${modulesdir}/lib/modules/${kernelversion}/ \
        --kver="${kernelversion}" ${initramfs}
 if [[ $? != 0 ]]; then
