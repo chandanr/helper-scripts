@@ -190,6 +190,22 @@ def checkout_kdevops_git_branch():
 
         os.chdir(top_dir)
 
+def enable_persistent_journal():
+    for td in test_dirs.keys():
+        os.chdir(td)
+
+        cmdstring = ("ansible -i ./hosts --become-user root "
+                     "--become-method sudo --become all "
+                     "-m lineinfile -a  \"path=/etc/systemd/journald.conf "
+                     "regexp='^#?Storage=.*$' line=Storage=persistent\"")
+
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+
+        os.chdir(top_dir)
+
+
 def setup_expunges(kernel_version):
     commit_msg = 'chandan: Add expunge list'
 
@@ -541,6 +557,9 @@ def execute_tests():
     kernel_version = get_kernel_version()
 
     print(f"[automation] Using kernel {kernel_version}")
+
+    print("[automation] Enable persistent journal")
+    enable_persistent_journal()
 
     print("[automation] Create expunge list")
     setup_expunges(kernel_version)
