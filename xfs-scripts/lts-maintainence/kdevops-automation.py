@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from junitparser import JUnitXml, Property, Properties, Failure, Error, Skipped
 import subprocess
 import argparse
 import psutil
@@ -107,34 +108,35 @@ def print_fail_tests_list(kernel_version):
 
         os.chdir(top_dir)
 
-def print_skipped_tests_list(kernel_version):
+# Find diff between two directories with the following command:
+# diff -u --recursive --new-file <dir1> <dir2>
+def print_skipped_tests_list(kernel_version, dest_dir):
+    # pdb.set_trace()
     for td in test_dirs.keys():
-        print(f"=> {td}")
         os.chdir(td)
 
+        kdevops_result_path = os.path.join(dest_dir, td)
+        os.mkdir(kdevops_result_path)
+
         path = os.path.join("workflows/fstests/results/", kernel_version)
-        for entry in os.listdir(path):
-            entry = os.path.join(path, entry)
+        for section in os.listdir(path):
+            entry = os.path.join(path, section)
             if not os.path.isdir(entry):
                 continue
+            section_result_path = os.path.join(kdevops_result_path, section)
 
-            print(f"\tSection - {os.path.basename(entry)}")
+            with open(section_result_path, "w") as rfp:
+                result_xml = os.path.join(entry, 'result.xml')
+                if not os.path.isfile(result_xml):
+                    continue
 
-            result_xml = os.path.join(entry, "result.xml")
-            with open(result_xml, "r") as fp:
-                xml = fp.read()
+                junit_xml = JUnitXml.fromfile(result_xml)
+                for tc in junit_xml:
+                    for result in tc.result:
+                        if not isinstance(result, Skipped):
+                            continue
 
-            search_re = '<testcase.*\n.*<skipped.*'
-            skip_start = 0
-            while True:
-                match = re.search(search_re, xml[skip_start:], re.MULTILINE)
-                if match == None:
-                    break
-
-                skipped_test = xml[skip_start + match.start():skip_start + match.end()]
-                print(f'\t\t{skipped_test}')
-
-                skip_start = skip_start + match.end() + 1
+                        print(f"{tc.name}; {result.message}", file=rfp)
 
         os.chdir(top_dir)
 
@@ -552,6 +554,9 @@ def execute_tests():
 
 parser = argparse.ArgumentParser(description="Automate kdevops usage")
 
+parser.add_argument("-D", dest="dest_dir", action='store', default=None,
+                    help="Destination directory",
+                    required=False)
 group = parser.add_mutually_exclusive_group()
 group.add_argument("-d", dest="destroy_resources", default=False,
                     action='store_true',
@@ -586,6 +591,11 @@ args = parser.parse_args()
 kdevops_dirs_exist()
 kdevops_fstests_script_exists()
 
+if args.dest_dir != None:
+    if os.path.exists(args.dest_dir):
+        shutil.rmtree(args.dest_dir)
+    os.mkdir(args.dest_dir)
+
 if args.destroy_resources:
     print("[automation] Destroying resources")
     destroy_resources()
@@ -593,8 +603,12 @@ elif args.fail_kernel_version != None:
     print(f"[automation] Print test fail list for {args.fail_kernel_version}")
     print_fail_tests_list(args.fail_kernel_version)
 elif args.skipped_kernel_version != None:
+    if args.dest_dir == None:
+        print("Please specify '-D <destination directory' option",
+              file=sys.stderr)
+        sys.exit(1)
     print(f"[automation] Print skipped test list for {args.skipped_kernel_version}")
-    print_skipped_tests_list(args.skipped_kernel_version)
+    print_skipped_tests_list(args.skipped_kernel_version, args.dest_dir)
 elif args.print_repo_status:
     print("[automation] Print repository status")
     print_repo_status()
