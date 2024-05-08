@@ -48,6 +48,7 @@ if [[ -h $symlink ]]; then
 fi
 
 ln -s ${modulesdir}/lib/modules/${kernelversion} /lib/modules/${kernelversion}
+chmod 0755 ${modulesdir}/lib/modules/${kernelversion}
 
 echo "Contents of /lib/modules/${kernelversion}"
 ls -lh /lib/modules/${kernelversion}
