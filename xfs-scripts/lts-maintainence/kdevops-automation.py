@@ -20,7 +20,7 @@ kdevops_config_dir = "configs/kdevops-configs/"
 kernel_config = "configs/kernel-configs/config-kdevops"
 
 kdevops_remote_repo = "oracle-gitlab"
-remote_kernel_dir="/data/linux-stable"
+remote_kernel_dir="/data/xfs-linux"
 kdevops_fstests_script = "kdevops-fstests-iterate.sh"
 kdevops_stop_iteration_file = "kdevops-stop-iteration"
 fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
@@ -70,6 +70,7 @@ def kdevops_fstests_script_exists():
 def destroy_resources():
     for td in test_dirs.keys():
         print(f"=> {td}")
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
 
         cmdstring = "make destroy"
@@ -90,6 +91,7 @@ def destroy_resources():
 def print_fail_tests_list(kernel_version):
     for td in test_dirs.keys():
         print(f"=> {td}")
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
 
         path = os.path.join("workflows/fstests/expunges/", kernel_version,
@@ -113,7 +115,7 @@ def print_fail_tests_list(kernel_version):
 def print_skipped_tests_list(kernel_version, dest_dir):
     # pdb.set_trace()
     for td in test_dirs.keys():
-        os.chdir(td)
+        os.chdir(os.path.join(td, "kdevops"))
 
         kdevops_result_path = os.path.join(dest_dir, td)
         os.mkdir(kdevops_result_path)
@@ -143,6 +145,7 @@ def print_skipped_tests_list(kernel_version, dest_dir):
 def print_repo_status():
     for td in test_dirs.keys():
         print(f"=> {td}")
+        td = os.path.join(td, "kdevops-results-archive")
         os.chdir(td)
 
         cmdstring = 'git --no-pager log -n 1 --pretty=format:"%H\t%ar%n"'
@@ -169,13 +172,14 @@ def toggle_stop_iter_file():
 
 def checkout_kdevops_git_branch():
     for td in test_dirs.keys():
-        os.chdir(td)
+        os.chdir(os.path.join(td, "kdevops"))
 
         branch = test_dirs[td]['kdevops_branch']
 
         cmdstrings = [
             "git reset --hard HEAD",
             "git checkout " + branch,
+            "git fetch " + kdevops_remote_repo,
             "git reset --hard " + kdevops_remote_repo + "/" + branch
         ]
 
@@ -192,6 +196,7 @@ def checkout_kdevops_git_branch():
 
 def enable_persistent_journal():
     for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
 
         cmdstring = ("ansible -i ./hosts --become-user root "
@@ -213,7 +218,7 @@ def setup_expunges(kernel_version):
         if test_dirs[td]['expunges'] == None:
             continue
 
-        os.chdir(td)
+        os.chdir(os.path.join(td, "kdevops"))
 
         cmdstring = "git log -n 1 --pretty=format:'%s'"
         cmd = shlex.split(cmdstring)
@@ -235,9 +240,9 @@ def setup_expunges(kernel_version):
 
         expunges = test_dirs[td]['expunges']
         for section in expunges.keys():
-            path = os.path.join(path, section)
+            spath = os.path.join(path, section)
             expunge_list = expunges[section]
-            with open(path, 'w') as f:
+            with open(spath, 'w') as f:
                 for test in expunge_list:
                     f.write(test + '\n')
 
@@ -260,23 +265,24 @@ def setup_expunges(kernel_version):
 
 def copy_kdevops_config():
     for td in test_dirs.keys():
-        src = kdevops_config_dir + "/" + td
+        src = os.path.join(kdevops_config_dir, td)
 
         if not os.path.exists(src):
             print(f'{src}: kdevops config file does not exist')
             exit(1)
 
-        dst = os.path.join(td, ".config")
+        dst = os.path.join(td, "kdevops", ".config")
         shutil.copy(src, dst)
 
 def copy_kernel_build_config():
     for td in test_dirs.keys():
-        shutil.copy(kernel_config,
-                    td + "/playbooks/roles/bootlinux/templates/")
+        path = os.path.join(td, "kdevops",
+                            "playbooks/roles/bootlinux/templates")
+        shutil.copy(kernel_config, path)
 
 def set_quota_mount_options(quota_opts):
     for td in test_dirs.keys():
-        config_path = td + "/.config"
+        config_path = os.path.join(td, "kdevops", ".config")
         with open(config_path, "r") as f:
             content = f.read()
 
@@ -299,7 +305,7 @@ def set_quota_mount_options(quota_opts):
 
 def set_kernel_git_tree_revspec():
     for td in test_dirs.keys():
-        config_path = td + "/.config"
+        config_path = os.path.join(td, "kdevops", ".config")
         with open(config_path, "r") as f:
             content = f.read()
             # TODO: Why is kernel_revspec mentioned twice in the .config
@@ -315,7 +321,7 @@ def set_kernel_git_tree_revspec():
 
 def set_kdevops_git_tree_custom_tag():
     for td in test_dirs.keys():
-        config_path = td + "/.config"
+        config_path = os.path.join(td, "kdevops", ".config")
         kdevops_branch = test_dirs[td]['kdevops_branch']
 
         with open(config_path, "r") as f:
@@ -330,6 +336,7 @@ def set_kdevops_git_tree_custom_tag():
 def build_kdevops():
     for td in test_dirs.keys():
         print(f"=> {td}")
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
         cmdstring = "make"
         print(f"{td}: Executing make")
@@ -345,7 +352,7 @@ def build_kdevops():
 
 def bringup_cloud_instances():
     for td in test_dirs.keys():
-        os.chdir(td)
+        os.chdir(os.path.join(td, "kdevops"))
 
         cmdstring = "make bringup"
         print(f"{td}: Bringing up instance")
@@ -393,9 +400,22 @@ def bringup_cloud_instances():
             sys.exit(1)
 
 
+def disable_systemd_coredump():
+    for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
+        os.chdir(td)
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all -m sysctl -a'
+                     ' "name=kernel.core_pattern value=/dev/null"')
+        print(f"{td}: Disabling systemd coredump")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+        os.chdir(top_dir)
+
 def build_linux_kernel():
     for td in test_dirs.keys():
-        os.chdir(td)
+        os.chdir(os.path.join(td, "kdevops"))
         cmdstring = "make linux"
         print(f"{td}: Started linux kernel build")
         cmd = shlex.split(cmdstring)
@@ -422,6 +442,7 @@ def verify_kernel_head_commit():
                  "git --no-pager log -n 1 --pretty=format:\"%h %s%n\"'")
 
     for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
 
         print(f"{td}: Obtaining Linux HEAD commit")
@@ -453,6 +474,7 @@ def get_kernel_version():
     kernel = ""
 
     for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
 
         cmdstring = ("ansible -i ./hosts --become-user root --become-method "
@@ -482,6 +504,7 @@ def get_kernel_version():
 
 def build_and_install_fstests():
     for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
         os.chdir(td)
         cmdstring = "make fstests"
         print(f"{td}: Building and installing fstests")
@@ -498,7 +521,7 @@ def build_and_install_fstests():
 def execute_fstests_baseline(kernel_version):
     for td in test_dirs.keys():
         print(f"=> {td}")
-        os.chdir(td)
+        os.chdir(os.path.join(td, "kdevops"))
 
         nr_test_iters = test_dirs[td]['nr_test_iters']
         cmdstring = fstests_baseline_cmd.format(kernel_version, nr_test_iters,
