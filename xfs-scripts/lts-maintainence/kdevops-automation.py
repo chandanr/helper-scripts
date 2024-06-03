@@ -28,30 +28,35 @@ fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
 test_dirs = {
     "kdevops-all" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
+        'kdevops_results_archive_branch' : 'origin/main',
         'expunges' : None,
         'nr_test_iters'  : 12,
     },
 
     "kdevops-externaldev" : {
         'kdevops_branch' : "upstream-xfs-externaldev-expunges",
+        'kdevops_results_archive_branch' : 'origin/main',
         'expunges' : { 'all.txt' : ['xfs/538'] },
         'nr_test_iters' : 12,
     },
 
     "kdevops-dangerous-fsstress-repair" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
+        'kdevops_results_archive_branch' : 'origin/main',
         'expunges' : None,
         'nr_test_iters'  : 4,
     },
 
     "kdevops-dangerous-fsstress-scrub" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
+        'kdevops_results_archive_branch' : 'origin/main',
         'expunges' : None,
         'nr_test_iters'  : 2,
     },
 
     "kdevops-recoveryloop" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
+        'kdevops_results_archive_branch' : 'origin/main',
         'expunges' : None,
         'nr_test_iters'  : 15,
     },
@@ -184,6 +189,28 @@ def checkout_kdevops_git_branch():
         ]
 
         for cs in cmdstrings:
+            cmd = shlex.split(cs)
+            proc = subprocess.Popen(cmd)
+            proc.wait()
+
+            if proc.returncode < 0:
+                print(f"\"{cmdstring}\" failed")
+                sys.exit(1)
+
+        os.chdir(top_dir)
+
+def checkout_kdevops_results_archive_git_branch():
+    for td in test_dirs.keys():
+        os.chdir(os.path.join(td, "kdevops-results-archive"))
+
+        branch = test_dirs[td]['kdevops_results_archive_branch']
+
+        cmdstrings = [
+            "git reset --hard " + branch,
+        ]
+
+        for cs in cmdstrings:
+            print(f"cs = {cs}")
             cmd = shlex.split(cs)
             proc = subprocess.Popen(cmd)
             proc.wait()
@@ -547,6 +574,9 @@ def execute_fstests_baseline(kernel_version):
 def execute_tests():
     print("[automation] Checkout kdevops git branch")
     checkout_kdevops_git_branch()
+
+    print("[automation] Checkout kdevops results archive git branch")
+    checkout_kdevops_results_archive_git_branch()
 
     print("[automation] Copy kdevops config")
     copy_kdevops_config()
