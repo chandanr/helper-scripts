@@ -571,6 +571,29 @@ def execute_fstests_baseline(kernel_version):
             print(f"{td}: fstests-baseline loop failed")
             sys.exit(1)
 
+def print_test_results():
+    for td in test_dirs.keys():
+        print(f"=> {td}")
+        os.chdir(os.path.join(td, "kdevops"))
+
+        print(f"{td}: Printing fstests progress")
+        cmdstring = "ansible -i ./hosts --list-hosts all"
+        cmd = shlex.split(cmdstring)
+        hosts = subprocess.check_output(cmd)
+        hosts = hosts.decode()
+        hosts = hosts.strip().split('\n')[1:]
+        for h in hosts:
+            h = h.strip()
+            print(f"\t host = {h}")
+            cmdstring = f"ssh {h} -C 'journalctl -t fstests'"
+            cmd = shlex.split(cmdstring)
+            results = subprocess.check_output(cmd)
+            results = results.decode()
+            print(f"\t {results}")
+
+        os.chdir(top_dir)
+
+
 def execute_tests():
     print("[automation] Checkout kdevops git branch")
     checkout_kdevops_git_branch()
@@ -652,7 +675,10 @@ group.add_argument("-t", dest="execute_tests", default=False,
                    action='store_true',
                    help="Execute fstests",
                    required=False)
-
+group.add_argument("-T", dest="print_test_results", default=False,
+                   action='store_true',
+                   help="Print fstests test results",
+                   required=False)
 parser.add_argument("-q", dest="quota_opts", default="usrquota,grpquota,prjquota",
                     action='store',
                     help="Quota options to be passed during mount",
@@ -689,5 +715,8 @@ elif args.toggle_stop_iter_file:
     toggle_stop_iter_file()
 elif args.execute_tests:
     execute_tests()
+elif args.print_test_results:
+    print("[automation] Print test results")
+    print_test_results()
 else:
     print("[automation] Nothing to do")
