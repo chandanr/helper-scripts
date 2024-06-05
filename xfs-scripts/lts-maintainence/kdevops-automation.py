@@ -691,7 +691,8 @@ kdevops_fstests_script_exists()
 
 if args.dest_dir != None:
     if os.path.exists(args.dest_dir):
-        shutil.rmtree(args.dest_dir)
+        print(f"{args.dest_dir} already exists; Please delete it")
+        sys.exit(1)
     os.mkdir(args.dest_dir)
 
 if args.destroy_resources:
