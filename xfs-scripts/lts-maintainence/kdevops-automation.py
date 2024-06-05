@@ -530,20 +530,24 @@ def get_kernel_version():
 
 
 def build_and_install_fstests():
+    cmdstring = "make fstests"
+    cmd = shlex.split(cmdstring)
+
     for td in test_dirs.keys():
-        td = os.path.join(td, "kdevops")
-        os.chdir(td)
-        cmdstring = "make fstests"
+        os.chdir(os.path.join(td, "kdevops"))
         print(f"{td}: Building and installing fstests")
-        cmd = shlex.split(cmdstring)
         proc = subprocess.Popen(cmd)
+        test_dirs[td]['popen'] = proc
+        os.chdir(top_dir)
+
+    for td in test_dirs.keys():
+        proc = test_dirs[td]['popen']
+        test_dirs[td]['popen'] = None
         proc.wait()
 
         if proc.returncode < 0:
             print(f"\"{cmdstring}\" failed")
             sys.exit(1)
-
-        os.chdir(top_dir)
 
 def execute_fstests_baseline(kernel_version):
     for td in test_dirs.keys():
