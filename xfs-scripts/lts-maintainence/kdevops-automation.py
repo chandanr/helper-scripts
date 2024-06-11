@@ -29,6 +29,7 @@ test_dirs = {
     "kdevops-all" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
         'kdevops_results_archive_branch' : 'origin/main',
+        'kdevops_hosts_prefix' : 'chanbabuall',
         'expunges' : None,
         'nr_test_iters'  : 12,
     },
@@ -36,6 +37,7 @@ test_dirs = {
     "kdevops-externaldev" : {
         'kdevops_branch' : "upstream-xfs-externaldev-expunges",
         'kdevops_results_archive_branch' : 'origin/main',
+        'kdevops_hosts_prefix' : 'chanbabuexternaldev',
         'expunges' : { 'all.txt' : ['xfs/538'] },
         'nr_test_iters' : 12,
     },
@@ -43,6 +45,7 @@ test_dirs = {
     "kdevops-dangerous-fsstress-repair" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
         'kdevops_results_archive_branch' : 'origin/main',
+        'kdevops_hosts_prefix' : 'chanbaburepair',
         'expunges' : None,
         'nr_test_iters'  : 4,
     },
@@ -50,6 +53,7 @@ test_dirs = {
     "kdevops-dangerous-fsstress-scrub" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
         'kdevops_results_archive_branch' : 'origin/main',
+        'kdevops_hosts_prefix' : 'chanbabuscrub',
         'expunges' : None,
         'nr_test_iters'  : 2,
     },
@@ -57,6 +61,7 @@ test_dirs = {
     "kdevops-recoveryloop" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
         'kdevops_results_archive_branch' : 'origin/main',
+        'kdevops_hosts_prefix' : 'chanbaburecoveryloop',
         'expunges' : None,
         'nr_test_iters'  : 15,
     },
@@ -360,6 +365,19 @@ def set_kdevops_git_tree_custom_tag():
         with open(config_path, "w") as f:
             f.write(content)
 
+def set_kdevops_hosts_prefix():
+    for td in test_dirs.keys():
+        config_path = os.path.join(td, "kdevops", ".config")
+        host_prefix = test_dirs[td]['kdevops_hosts_prefix']
+        with open(config_path, 'r') as f:
+            content = f.read()
+            content = re.sub("^CONFIG_KDEVOPS_HOSTS_PREFIX=.+$",
+                             "CONFIG_KDEVOPS_HOSTS_PREFIX=" + host_prefix,
+                             content, flags = re.MULTILINE)
+
+        with open(config_path, 'w') as f:
+            f.write(content)
+
 def build_kdevops():
     for td in test_dirs.keys():
         print(f"=> {td}")
@@ -619,6 +637,9 @@ def execute_tests():
 
     print("[automation] Set kdevops git tree custom tag")
     set_kdevops_git_tree_custom_tag()
+
+    print("[automation] Set kdevops hosts prefix")
+    set_kdevops_hosts_prefix()
 
     print("[automation] Build kdevops")
     build_kdevops()
