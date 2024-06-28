@@ -25,6 +25,8 @@ kdevops_fstests_script = "kdevops-fstests-iterate.sh"
 kdevops_stop_iteration_file = "kdevops-stop-iteration"
 fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
 
+crash_kernel_reserve_mem = "3G"
+
 test_dirs = {
     "kdevops-all" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
@@ -458,6 +460,56 @@ def disable_systemd_coredump():
         proc.wait()
         os.chdir(top_dir)
 
+def enable_panic_on_oops():
+    for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
+        os.chdir(td)
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all -m sysctl -a'
+                     ' "name=kernel.panic_on_oops value=1"')
+        print(f"{td}: Disabling systemd coredump")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+        os.chdir(top_dir)
+
+def enable_softlockup_panic():
+    for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
+        os.chdir(td)
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all -m sysctl -a'
+                     ' "name=kernel.softlockup_panic value=1"')
+        print(f"{td}: Disabling systemd coredump")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+        os.chdir(top_dir)
+
+def set_crashkernel_mem(mem_str):
+    for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
+        os.chdir(td)
+
+        cmdstring = (r'ansible -i ./hosts --become-user root '
+                     r'--become-method sudo '
+                     r'--become all -m lineinfile '
+                     r'-a "path=/etc/default/grub '
+                     r"regexp='^GRUB_CMDLINE_LINUX="
+                     r'\"crashkernel=[^\s]+ (.*)$'
+                     r"' "
+                     r"line='GRUB_CMDLINE_LINUX="
+                     r'\"'
+                     f'crashkernel={mem_str} \\1'
+                     r"' "
+                     r'backrefs=yes"')
+
+        print(f"{td}: Set crashkernel reserve memory to {mem_str}")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+        os.chdir(top_dir)
+
 def build_linux_kernel():
     for td in test_dirs.keys():
         os.chdir(os.path.join(td, "kdevops"))
@@ -646,6 +698,15 @@ def execute_tests():
 
     print("[automation] Bring up cloud instances")
     bringup_cloud_instances()
+
+    print("[automation] Enable panic_on_oops")
+    enable_panic_on_oops()
+
+    print("[automation] Enable softlockup_panic")
+    enable_softlockup_panic()
+
+    print("[automation] Set crash kernel reserve memory")
+    set_crashkernel_mem(crash_kernel_reserve_mem)
 
     print("[automation] Build Linux kernel")
     build_linux_kernel()
