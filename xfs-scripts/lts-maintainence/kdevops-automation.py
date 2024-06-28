@@ -27,6 +27,11 @@ fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
 
 crash_kernel_reserve_mem = "3G"
 
+oci_region = ''
+oci_availability_domain = ''
+oci_subnet_ocid = ''
+oci_os_image_ocid = ''
+
 test_dirs = {
     "kdevops-all" : {
         'kdevops_branch' : "upstream-xfs-common-expunges",
@@ -336,6 +341,41 @@ def set_quota_mount_options(quota_opts):
         with open(config_path, "w") as f:
             f.write(content)
 
+def set_oci_opts():
+    for td in test_dirs.keys():
+        config_path = os.path.join(td, "kdevops", ".config")
+        with open(config_path, "r") as f:
+            content = f.read()
+
+            if 'CONFIG_TERRAFORM_OCI_REGION' in content:
+                content = re.sub("^CONFIG_TERRAFORM_OCI_REGION=.+$",
+                                 "", content, flags = re.MULTILINE)
+                content = content + '\n' + 'CONFIG_TERRAFORM_OCI_REGION=' + \
+                    oci_region + '\n'
+
+            if 'CONFIG_TERRAFORM_OCI_AVAILABLITY_DOMAIN' in content:
+                content = re.sub("^CONFIG_TERRAFORM_OCI_AVAILABLITY_DOMAIN=.+$",
+                                 "", content, flags = re.MULTILINE)
+                content = content + '\n' + \
+                    'CONFIG_TERRAFORM_OCI_AVAILABLITY_DOMAIN=' + \
+                    oci_availability_domain + '\n'
+
+            if 'CONFIG_TERRAFORM_OCI_SUBNET_OCID' in content:
+                content = re.sub("^CONFIG_TERRAFORM_OCI_SUBNET_OCID=.+$",
+                                 "", content, flags = re.MULTILINE)
+                content = content + '\n' + \
+                    'CONFIG_TERRAFORM_OCI_SUBNET_OCID=' + \
+                    oci_subnet_ocid + '\n'
+
+            if 'CONFIG_TERRAFORM_OCI_OS_IMAGE_OCID' in content:
+                content = re.sub("^CONFIG_TERRAFORM_OCI_OS_IMAGE_OCID=.+$",
+                                 "", content, flags = re.MULTILINE)
+                content = content + '\n' + \
+                    'CONFIG_TERRAFORM_OCI_OS_IMAGE_OCID=' + \
+                    oci_os_image_ocid + '\n'
+
+        with open(config_path, "w") as f:
+            f.write(content)
 
 def set_kernel_git_tree_revspec():
     for td in test_dirs.keys():
@@ -683,6 +723,9 @@ def execute_tests():
 
     print("[automation] Set up quota mount options")
     set_quota_mount_options(args.quota_opts)
+
+    print("[automation] Set oci specific values")
+    set_oci_opts()
 
     print("[automation] Set kernel git tree revspec")
     set_kernel_git_tree_revspec()
