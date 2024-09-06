@@ -18,27 +18,29 @@ EOF
 
 rm -rf ${perf_bin_file} ${perf_bin_file}.old
 
-if [[ ! -a /usr/local/sbin/xfs_repair_backup ]]; then
-	mv /usr/local/sbin/xfs_repair /usr/local/sbin/xfs_repair_backup
-	echo $return_success > /usr/local/sbin/xfs_repair
-	chmod a+x /usr/local/sbin/xfs_repair
+xfs_repair=/usr/local/sbin/xfs_repair
+file $xfs_repair | grep -i -q ELF
+if [[ $? == 0 ]]; then
+	mv $xfs_repair ${xfs_repair}_backup
+	echo $return_success > $xfs_repair
+	chmod a+x $xfs_repair
 fi
 
-if [[ ! -a /usr/local/usr/sbin/xfs_scrub_backup ]]; then
-	mv /usr/local/usr/sbin/xfs_scrub /usr/local/usr/sbin/xfs_scrub_backup
-	echo $return_success > /usr/local/usr/sbin/xfs_scrub
-	chmod a+x /usr/local/usr/sbin/xfs_scrub
+xfs_scrub=/usr/local/usr/sbin/xfs_scrub
+file $xfs_scrub | grep -i -q ELF
+if [[ $? == 0 ]]; then
+	mv $xfs_scrub ${xfs_scrub}_backup
+	echo $return_success > $xfs_scrub
+	chmod a+x $xfs_scrub
 fi
 
-if [[ ! -a /usr/local//usr/sbin/xfs_spaceman_backup ]]; then
-	mv /usr/local//usr/sbin/xfs_spaceman /usr/local//usr/sbin/xfs_spaceman_backup
-	echo $return_success > /usr/local//usr/sbin/xfs_spaceman
-	chmod a+x /usr/local//usr/sbin/xfs_spaceman
+xfs_spaceman=/usr/local/usr/sbin/xfs_spaceman
+file $xfs_spaceman  | grep -i -q ELF
+if [[ $? == 0 ]]; then
+	mv $xfs_spaceman ${xfs_spaceman}_backup
+	echo $return_success > $xfs_spaceman
+	chmod a+x $xfs_spaceman
 fi
-
-# chmod a+x /usr/local/sbin/xfs_repair
-# chmod a+x /usr/local/usr/sbin/xfs_scrub
-# exit 0
 
 dnf '--enablerepo=*' builddep -y perf | tee -a $log_file
 dnf install -y libunwind-devel | tee -a $log_file
@@ -94,11 +96,12 @@ kill_long_running_perf()
 	done
 }
 
-
 i=0
 while [ 1 ]; do
 	(( i = i + 1 ));
 	echo "---- $i ----"
+
+	rm -rf ${perf_bin_file} ${perf_bin_file}.old
 
 	perf record -m 256M -r 1 -c 1 -o $perf_bin_file -e 'xfs:*' -g -a &
 	perf_pid=$!
@@ -108,7 +111,7 @@ while [ 1 ]; do
 	long_running_perf_pid=$!
 	echo "Long running perf pid = $long_running_perf_pid"
 
-	./naggy-check.sh --section $section -c 1 -f xfs/057
+	./naggy-check.sh --section $section -c 1 -f  xfs/057
 
 	echo "killing long_running_perf_pid $long_running_perf_pid"
 	kill -9 $long_running_perf_pid
