@@ -445,47 +445,9 @@ def bringup_cloud_instances():
         print(f"{td}: Bringing up instance")
         cmd = shlex.split(cmdstring)
         proc = subprocess.Popen(cmd)
-        test_dirs[td]['popen'] = proc
-
-        # Wait until terrform starts
-        terraform_running = False
-        while not terraform_running:
-            for p in psutil.process_iter():
-                pname = psutil.Process(p.pid).name()
-                if re.match('terraform.*', pname):
-                    terraform_running = True
-                    break
-            time.sleep(1)
-
-        print(f"{td} terraform process started")
-
-        # Wait until .ssh/config entries are added
-        while True:
-            terraform_running = False
-
-            for p in psutil.process_iter():
-                pname = psutil.Process(p.pid).name()
-                if re.match('terraform.*', pname):
-                    print(f"{td} Waiting for terraform process {p.pid} to complete")
-                    terraform_running = True
-                    time.sleep(1)
-                    break
-
-            if not terraform_running:
-                print(f"{td} terraform process completed")
-                break
-
-        os.chdir(top_dir)
-
-    for td in test_dirs.keys():
-        proc = test_dirs[td]['popen']
-        test_dirs[td]['popen'] = None
         proc.wait()
 
-        if proc.returncode < 0:
-            print(f"{td}: Bringup failed")
-            sys.exit(1)
-
+        os.chdir(top_dir)
 
 def disable_systemd_coredump():
     for td in test_dirs.keys():
