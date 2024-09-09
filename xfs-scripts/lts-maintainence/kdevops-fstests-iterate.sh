@@ -63,7 +63,9 @@ for (( i = $start_iteration; i <= $end_iteration; i++ )); do
 		exit 1
 	fi
 
+	cd ../kdevops-results-archive/
 	git commit -s -m "Iteration $i: copy_results.sh"
+	cd -
 
 	./scripts/workflows/fstests/find-common-failures.sh -l $expunges_dir
 	./scripts/workflows/fstests/remove-common-failures.sh $expunges_dir
