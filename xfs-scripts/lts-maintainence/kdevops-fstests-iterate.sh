@@ -63,7 +63,7 @@ for (( i = $start_iteration; i <= $end_iteration; i++ )); do
 		exit 1
 	fi
 
-	git commit -s -m "copy_results.sh: Iteration $i"
+	git commit -s -m "Iteration $i: copy_results.sh"
 
 	./scripts/workflows/fstests/find-common-failures.sh -l $expunges_dir
 	./scripts/workflows/fstests/remove-common-failures.sh $expunges_dir
@@ -83,7 +83,7 @@ for (( i = $start_iteration; i <= $end_iteration; i++ )); do
 
 	git diff --cached --exit-code > /dev/null 2>&1
 	if [[ $? == 1 ]]; then
-		git commit -s -m "Committing untracked files"
+		git commit -s -m "Iteration $i: Committing untracked files"
 	fi
 
 	for f in $(git diff --name-only); do
@@ -98,6 +98,6 @@ for (( i = $start_iteration; i <= $end_iteration; i++ )); do
 
 	git diff --cached --exit-code > /dev/null 2>&1
 	if [[ $? == 1 ]]; then
-		git commit -s -m "Committing new test failures"
+		git commit -s -m "Iteration $i: Committing new test failures"
 	fi
 done 2>&1 | tee -a $log
