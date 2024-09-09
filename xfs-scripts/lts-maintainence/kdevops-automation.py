@@ -25,6 +25,7 @@ kdevops_fstests_script = "kdevops-fstests-iterate.sh"
 kdevops_stop_iteration_file = "kdevops-stop-iteration"
 fstests_baseline_cmd = "time " + kdevops_fstests_script + " {} 1 {} {} ./{}"
 
+makedumpfile_repo = ""
 crash_kernel_reserve_mem = "3G"
 
 oci_region = ''
@@ -115,7 +116,9 @@ def print_fail_tests_list(kernel_version):
                             "xfs/unassigned")
         if not os.path.exists(path):
             print(f"{path} does not exist")
-            sys.exit(1)
+            # sys.exit(1)
+            os.chdir(top_dir)
+            continue
 
         for f in glob.glob(path + "/*.txt"):
             if os.stat(f).st_size == 0:
@@ -488,28 +491,45 @@ def enable_softlockup_panic():
         proc.wait()
         os.chdir(top_dir)
 
-def set_crashkernel_mem(mem_str):
+def install_upstream_makedumpfile():
     for td in test_dirs.keys():
         td = os.path.join(td, "kdevops")
         os.chdir(td)
 
-        cmdstring = (r'ansible -i ./hosts --become-user root '
-                     r'--become-method sudo '
-                     r'--become all -m lineinfile '
-                     r'-a "path=/etc/default/grub '
-                     r"regexp='^GRUB_CMDLINE_LINUX="
-                     r'\"crashkernel=[^\s]+ (.*)$'
-                     r"' "
-                     r"line='GRUB_CMDLINE_LINUX="
-                     r'\"'
-                     f'crashkernel={mem_str} \\1'
-                     r"' "
-                     r'backrefs=yes"')
-
-        print(f"{td}: Set crashkernel reserve memory to {mem_str}")
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all '
+                     ' -m shell '
+                     f'-a "{makedumpfile_repo} /data/makedumpfile"')
+        print(f"{td}: Cloning Makedumpfile")
         cmd = shlex.split(cmdstring)
         proc = subprocess.Popen(cmd)
         proc.wait()
+
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all '
+                     ' -m shell -a "dnf --enablerepo=* builddep -y kexec-tools"')
+        print(f"{td}: Install makedumpfile build dependencies")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+
+        # make LINKTYPE=dynamic USELZO=on USESNAPPY=on USEZSTD=on
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all '
+                     ' -m shell -a "cd /data/makedumpfile; make LINKTYPE=dynamic USELZO=on USESNAPPY=on USEZSTD=on"')
+        print(f"{td}: Compiling Makedumpfile")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+
+        cmdstring = ('ansible -i ./hosts --become-user root'
+                     ' --become-method sudo --become all '
+                     ' -m shell -a "cd /data/makedumpfile; make install"')
+        print(f"{td}: Installing Makedumpfile")
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+
         os.chdir(top_dir)
 
 def build_linux_kernel():
@@ -530,6 +550,20 @@ def build_linux_kernel():
         if proc.returncode < 0:
             print(f"{td}: Building Linux kernel failed")
             sys.exit(1)
+
+def set_crashkernel_mem(mem_str):
+    for td in test_dirs.keys():
+        td = os.path.join(td, "kdevops")
+        os.chdir(td)
+
+        print(f"{td}: Set crashkernel reserve memory to {mem_str}")
+        cmdstring = ("ansible -i ./hosts --become-user root --become-method "
+                     "sudo --become all -m shell -a "
+                     f'\'grubby --update-kernel=ALL --args="crashkernel={mem_str}"\'')
+        cmd = shlex.split(cmdstring)
+        proc = subprocess.Popen(cmd)
+        proc.wait()
+        os.chdir(top_dir)
 
 def verify_kernel_head_commit():
     sha1 = ""
@@ -704,17 +738,24 @@ def execute_tests():
     print("[automation] Bring up cloud instances")
     bringup_cloud_instances()
 
+    # Disable systemd-coredump
+    print("[automation] Disabling systemd coredump")
+    disable_systemd_coredump()
+
     print("[automation] Enable panic_on_oops")
     enable_panic_on_oops()
 
     print("[automation] Enable softlockup_panic")
     enable_softlockup_panic()
 
-    print("[automation] Set crash kernel reserve memory")
-    set_crashkernel_mem(crash_kernel_reserve_mem)
+    print("[automation] Install upstream makedumpfile")
+    install_upstream_makedumpfile()
 
     print("[automation] Build Linux kernel")
     build_linux_kernel()
+
+    print("[automation] Set crash kernel reserve memory")
+    set_crashkernel_mem(crash_kernel_reserve_mem)
 
     print("[automation] Verify kernel HEAD commit")
     sha1, subject = verify_kernel_head_commit()
