@@ -1,0 +1,33 @@
+#!/usr/bin/bpftrace
+
+BEGIN
+{
+	if ($# != 1) {
+		printf("Usage: trace-xfs-inactive.bt <inode number>");
+		exit();
+	}
+
+	@ino = (uint64)$1;
+
+	printf("Inode number: %d\n", @ino);
+}
+
+kprobe:xfs_inactive
+{
+	$ip = (struct xfs_inode *)(arg0);
+
+	if ($ip->i_ino == @ino) {
+		printf("i_disk_size = %d; i_size = %d; i_df.if_nextents = %d\n",
+			$ip->i_disk_size, $ip->i_vnode.i_size,
+			$ip->i_df.if_nextents);
+	}
+}
+
+kprobe:xfs_bmap_del_extent_delay
+{
+	$ip = (struct xfs_inode *)(arg0);
+
+	if ($ip->i_ino == @ino) {
+		printf("Deleting delalloc extent\n");
+	}
+}

@@ -1,0 +1,51 @@
+#!/usr/bin/bpftrace
+
+BEGIN
+{
+	if ($# != 1) {
+		printf("Usage: <program name> <inode number>\n");
+		exit();
+	}
+
+	@ino_nr = (uint64)$1;
+}
+
+fentry:iput
+{
+	$ino = (args.inode)->i_ino;
+
+	if ($ino == @ino_nr) {
+		printf("iput_stack: inode = %d; inode refcount = %d; comm = %s; kstack = %s\n",
+				$ino, (args.inode)->i_count.counter, comm, kstack());
+	}
+}
+
+fentry:xfs_fs_destroy_inode
+{
+	$ino = (args.inode)->i_ino;
+
+	if ($ino == @ino_nr) {
+		printf("xfs_fs_destroy_inode_stack: inode = %d; inode refcount = %d; comm = %s; kstack = %s\n",
+				$ino, (args.inode)->i_count.counter, comm, kstack());
+		@xfs_destroy_inode_executed = 1;
+	}
+}
+
+fentry:xfs_inodegc_shrinker_count
+{
+	if (@xfs_destroy_inode_executed == 1) {
+		printf("xfs_inodegc_shrinker_count: comm = %s; kstack = %s\n",
+				comm, kstack());
+	}
+}
+
+tracepoint:xfs:xfs_inodegc_shrinker_scan
+{
+	printf("xfs_inodegc_shrinker_scan: comm = %s; kstack = %s\n",
+			comm, kstack());
+}
+
+END
+{
+	clear(@ino_nr);
+}
