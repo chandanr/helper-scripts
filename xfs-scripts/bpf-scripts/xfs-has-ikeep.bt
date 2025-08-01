@@ -1,0 +1,19 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_iget
+{
+	@check_get_random_u32[tid] = 1;
+}
+
+fexit:xfs_iget
+{
+	delete(@check_get_random_u32[tid]);
+}
+
+fentry:get_random_u32
+{
+	if (@check_get_random_u32[tid] == 1) {
+		printf("task = %s; stack = %s\n",
+				comm, kstack(perf));
+	}
+}

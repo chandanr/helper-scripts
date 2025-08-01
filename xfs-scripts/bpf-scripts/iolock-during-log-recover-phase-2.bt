@@ -1,0 +1,30 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_log_mount_finish
+{
+	@track_iolock[tid] = 1;
+}
+
+fexit:xfs_log_mount_finish
+{
+	delete(@track_iolock[tid]);
+}
+
+fentry:xfs_ilock,
+fentry:xfs_ilock_nowait
+{
+	$lock_flags = args.lock_flags;
+
+	if ($lock_flags & 0x3) {
+		$lock_type = "iolock";
+	}
+
+	if ($lock_flags & 0xc) {
+		$lock_type = "ilock";
+	}
+
+	if (@track_iolock[tid] == 1) {
+		printf("lock_type = %s; comm = %s; kstack = %s\n",
+				$lock_type, comm, kstack());
+	}
+}
