@@ -1,0 +1,17 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_buf_find_lock
+{
+	$xfs_buf = args.bp;
+	$lru_list_offset = offsetof(struct xfs_buf, b_lru);
+	$lru_list_head_ptr = (uint64)(args.bp) + $lru_list_offset;
+
+	$lru_list_head = $xfs_buf->b_lru;
+	$next = (uint64)($lru_list_head.next);
+	$prev = (uint64)($lru_list_head.prev);
+
+	if (($next != $lru_list_head_ptr) &&
+	    ($prev != $lru_list_head_ptr)) {
+		@b_hold_hist_when_xfs_buf_on_lru = hist(args.bp->b_hold.counter);
+	}
+}
