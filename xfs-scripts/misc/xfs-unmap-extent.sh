@@ -48,7 +48,6 @@ else
 	ret=0
 fi
 
-exit $ret
-
 umount $device
 
+exit $ret

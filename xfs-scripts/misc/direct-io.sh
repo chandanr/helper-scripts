@@ -6,7 +6,7 @@ testfile=${mntpnt}/testfile
 
 umount $device > /dev/null 2>&1
 
-mkfs.xfs -K -f $device
+mkfs.xfs -K -f -m bigtime=0,finobt=0 $device
 if [[ $? != 0 ]]; then
 	echo "mkfs failed."
 	exit 1
@@ -18,7 +18,8 @@ if [[ $? != 0 ]]; then
 	exit 1
 fi
 
-xfs_io -f -c 'pwrite 0 8000' $testfile
+perf record -e xfs:xfs_end_io_direct_write -g -a \
+     -- xfs_io -fd -c 'pwrite 0 8M' $testfile
 
 sync
 
