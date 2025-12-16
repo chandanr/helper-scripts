@@ -1,12 +1,11 @@
 #!/usr/bin/bash
 
-xfsprogs_dir=/root/repos/xfsprogs-dev
+xfsprogs_dir=/root/repos/xfsprogs-for-next
 
 cd $xfsprogs_dir
 
 make clean && \
 	OPTIMIZER="-g" BUILD_CFLAGS="-g" CFLAGS="-g" ./configure && \
-	make -j10
+	bear -- make -j10 # V=1
 
 # make DIST_ROOT=/opt/xfsprogs-build/ install
-	
