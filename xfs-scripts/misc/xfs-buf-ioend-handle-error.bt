@@ -1,0 +1,16 @@
+#!/usr/bin/bpftrace
+
+fentry:_xfs_buf_ioapply
+{
+	$xfs_buf = args.bp;
+	$bflags = $xfs_buf->b_flags;
+	$xbf_write = 1 << 1;
+	$xbf_async = 1 << 4;
+
+	if (($bflags & $xbf_write) &&
+	    !($bflags & $xbf_async)) {
+		printf("comm = %s; kstack = %s\n",
+				comm, kstack());
+	}
+}
+

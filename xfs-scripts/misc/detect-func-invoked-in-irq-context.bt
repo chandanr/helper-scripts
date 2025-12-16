@@ -1,0 +1,21 @@
+#!/usr/bin/bpftrace
+
+tracepoint:irq:softirq_entry,
+tracepoint:irq:irq_handler_entry,
+{
+	@in_interrupt_context[tid] = 1;
+}
+
+kprobe:xfs_buf_bio_end_io
+{
+	if (@in_interrupt_context[tid] == 1) {
+		printf("comm = %s; xfs_buf_bio_end_io invoked in interrupt context; kstack = %s\n",
+				comm, kstack());
+	}
+}
+
+tracepoint:irq:softirq_exit,
+tracepoint:irq:irq_handler_exit,
+{
+	delete(@in_interrupt_context[tid]);
+}

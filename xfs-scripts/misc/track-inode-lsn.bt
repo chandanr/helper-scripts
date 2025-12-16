@@ -1,0 +1,6 @@
+#!/usr/bin/bpftrace
+
+kprobe:xfs_inode_to_log_dinode
+{
+	printf("Inside xfs_inode_to_log_dinode\n");
+}

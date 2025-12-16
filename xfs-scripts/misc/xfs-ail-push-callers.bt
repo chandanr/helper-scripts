@@ -1,0 +1,6 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_ail_push
+{
+	@xfs_ail_push_callers[kstack()] = count();
+}

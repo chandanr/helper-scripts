@@ -1,0 +1,21 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_buf_wait_unpin
+{
+	$bno = args.bp->b_maps->bm_bn;
+
+	@nr_waiters[$bno]++;
+
+	if (@nr_waiters[$bno] == 2) {
+		printf("comm = %s; Two waiters waiting on block = %lu;\n",
+				comm, $bno);
+	}
+}
+
+fexit:xfs_buf_wait_unpin
+{
+	$bno = args.bp->b_maps->bm_bn;
+
+	@nr_waiters[$bno]--;
+}
+

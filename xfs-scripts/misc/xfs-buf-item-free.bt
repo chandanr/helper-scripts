@@ -1,0 +1,44 @@
+#!/usr/bin/env bpftrace
+
+/*
+ * fentry:xfs_inode_item_precommit
+ * {
+ * 	@in_xfs_inode_item_precommit_context[tid] = 1;
+ * }
+ * 
+ * fexit:xfs_inode_item_precommit
+ * {
+ * 	delete(@in_xfs_inode_item_precommit_context[tid]);
+ * }
+ */
+
+fentry:xfs_alloc_fix_freelist
+{
+	@in_xfs_alloc_fix_freelist[tid] = 1;
+}
+
+fexit:xfs_alloc_fix_freelist
+{
+	delete(@in_xfs_alloc_fix_freelist[tid]);
+}
+
+fentry:xfs_buf_inode_iodone
+{
+	@in_xfs_buf_inode_iodone[tid] = 1;
+}
+
+fexit:xfs_buf_inode_iodone
+{
+	delete(@in_xfs_buf_inode_iodone[tid]);
+}
+
+fentry:xfs_buf_item_free
+/ 
+  @in_xfs_alloc_fix_freelist[tid] != 1 &&
+  @in_xfs_buf_inode_iodone[tid] != 1 /
+{
+	if ((comm != "mount") && (comm != "xfs_scrub") &&
+	    (comm != "xfs_spaceman")) {
+		printf("comm = %s; kstack = %s\n", comm, kstack(perf));
+	}
+}

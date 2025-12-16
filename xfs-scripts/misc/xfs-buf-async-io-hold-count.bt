@@ -1,0 +1,13 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_buf_ioend
+{
+	$xbf_async = 1 << 4;
+	$xfs_buf = args.bp;
+	$b_hold = $xfs_buf->b_hold.counter;
+
+	if ($b_hold == 0) {
+		printf("Buffer with zero refcount: aync = %d\n",
+			($xfs_buf->b_flags & $xbf_async) ? 1 : 0);
+	}
+}

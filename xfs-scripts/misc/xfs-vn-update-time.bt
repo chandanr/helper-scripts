@@ -1,0 +1,6 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_vn_update_time
+{
+	printf("comm = %s; kstack = %s\n", comm, kstack());
+}

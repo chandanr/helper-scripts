@@ -1,0 +1,22 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:xfs:xfs_buf_lock_done
+/ args->bno == 2 && comm != "mount" && comm != "umount" && comm != "xfs_scrub" /
+{
+	@xfs_buf_locked[tid] = 1;
+	printf("lock: bno = %lu; kstack = %s\n", args->bno, kstack());
+}
+
+tracepoint:xfs:xfs_buf_unlock
+{
+	if (@xfs_buf_locked[tid] != 0) {
+		printf("unlock: bno = %lu; kstack = %s\n", args->bno,
+			kstack());
+		delete(@xfs_buf_locked[tid]);
+	}
+}
+
+END
+{
+	clear(@xfs_buf_locked);
+}

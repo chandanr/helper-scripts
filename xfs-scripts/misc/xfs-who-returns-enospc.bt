@@ -1,0 +1,25 @@
+#!/usr/bin/bpftrace
+
+
+fexit:xfs_dialloc
+/retval == -28/
+{
+	printf("comm = %s; retval = %d; kstack = %s\n",
+			comm, retval, kstack());
+}
+
+/*
+ * tracepoint:xfs:xfs_trans_cancel
+ * {
+ * 	printf("comm = %s; kstack = %s\n", comm, kstack());
+ * }
+ */
+
+/*
+ * kretprobe:xfs_trans_*
+ * {
+ * 	if (retval != 0) {
+ * 		printf("Returning %d; kstack = %s\n", retval, kstack());
+ * 	}
+ * }
+ */

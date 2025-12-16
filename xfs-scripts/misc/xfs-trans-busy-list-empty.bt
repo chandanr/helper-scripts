@@ -1,0 +1,13 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_trans_free
+{
+	$head = (uint64)(args.tp) + offsetof(struct xfs_trans, t_busy);
+	$next = args.tp->t_busy.next;
+	$prev = args.tp->t_busy.prev;
+
+	if (!($next == $head && $prev == $head)) {
+		printf("xfs_trans_free: List has elements; kstack = %s\n",
+				kstack());
+	}
+}

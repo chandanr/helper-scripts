@@ -1,0 +1,28 @@
+#!/usr/bin/env bpftrace
+
+/*
+ * tracepoint:xfs:xfs_trans_read_buf,
+ * tracepoint:xfs:xfs_trans_get_buf
+ * {
+ * 	printf("xfs_trans_get_buf: tid = %lu; bno = %lu; kstack = %s\n", tid,
+ * 			args.buf_bno, kstack());
+ * }
+ * 
+ * tracepoint:xfs:xfs_trans_brelse,
+ * tracepoint:xfs:xfs_trans_read_buf_recur,
+ * tracepoint:xfs:xfs_trans_get_buf_recur
+ * {
+ * 	printf("xfs_trans_get_buf_recur: tid = %lu; bno = %lu; bli_recur = %lu; kstack = %s\n",
+ * 			tid, args.buf_bno, args.bli_recur, kstack());
+ * 
+ * 
+ * }
+ */
+
+tracepoint:xfs:xfs_buf_item_release
+{
+	if (args.bli_recur > 1) {
+		printf("xfs_buf_item_release: tid = %lu; bno = %lu; bli_recur = %lu; kstack = %s\n",
+				tid, args.buf_bno, args.bli_recur, kstack());
+	}
+}

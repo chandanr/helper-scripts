@@ -1,0 +1,26 @@
+#!/usr/bin/env bpftrace
+
+#define NULL 0
+
+kprobe:xfs_trans_get_buf_map
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" &&
+	   comm != "xfs_spaceman" /
+{
+	$tp = arg0;
+
+	if ($tp == NULL) {
+		printf("comm = %s; kstack = %s\n", comm, kstack());
+	}
+}
+
+kprobe:xfs_trans_read_buf_map
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" &&
+	   comm != "xfs_spaceman" /
+{
+	$tp = arg1;
+
+	if ($tp == NULL) {
+		printf("comm = %s; kstack = %s\n", comm, kstack());
+	}
+}
+

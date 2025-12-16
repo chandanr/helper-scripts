@@ -1,0 +1,64 @@
+#!/usr/bin/env bpftrace
+
+BEGIN
+{
+	@xbf_stale = 1 << 6;
+}
+
+fentry:xfs_agfl_free_finish_item
+{
+	@in_agfl_free_finish_item_ctx[tid] = 1;
+}
+
+fexit:xfs_agfl_free_finish_item
+{
+	delete(@in_agfl_free_finish_item_ctx[tid]);
+}
+
+fentry:xfs_buf_stale
+{
+	$bno = args.bp->b_maps->bm_bn;
+	printf("xfs_buf_stale: Block nr: %lu; kstack = %s\n", $bno, kstack());
+}
+
+tracepoint:xfs:xfs_buf_item_unpin_stale
+{
+	printf("xfs_buf_item_unpin_stale: Block nr: %lu; pincount = %lu; kstack = %s\n",
+			args.buf_bno, args.buf_pincount, kstack());
+}
+
+tracepoint:xfs:xfs_buf_rele
+{
+	if (args.flags & @xbf_stale) {
+		printf("xfs_buf_rele: Block nr: %lu; hold = %lu; pincount = %lu; kstack = %s\n",
+				args.bno, args.hold, args.pincount, kstack());
+	}
+}
+
+fentry:xfs_buf_find_lock
+{
+	@in_xfs_buf_find_lock_ctx[tid] = 1;
+}
+
+fexit:xfs_buf_find_lock
+{
+	delete(@in_xfs_buf_find_lock_ctx[tid]);
+}
+
+tracepoint:xfs:xfs_buf_lock_done
+{
+	if ((@in_agfl_free_finish_item_ctx[tid] == 0) &&
+	    (@in_xfs_buf_find_lock_ctx[tid] == 1)) {
+		$b_flags = args.flags;
+		if ($b_flags & @xbf_stale) {
+			printf("xfs_buf_lock_done: Block nr: %lu; hold = %lu; pincount = %lu; kstack = %s\n",
+					args.bno, args.hold, args.pincount, kstack());
+		}
+	}
+}
+
+END
+{
+	clear(@xbf_stale);
+	clear(@in_xfs_buf_find_lock_ctx);
+}

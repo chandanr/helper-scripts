@@ -1,0 +1,29 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_trans_dirty_buf
+{
+	$xfs_buf = args.bp;
+	@track_buf_item_relse[$xfs_buf] = 1;
+}
+
+fentry:xfs_buf_item_relse
+{
+	$xfs_buf = args.bp;
+
+	if (@track_buf_item_relse[$xfs_buf] == 1) {
+		$xfs_buf_log_item = $xfs_buf->b_log_item;
+		$refcount = $xfs_buf_log_item->bli_refcount.counter;
+
+		if ($refcount == 0) {
+			$flags = $xfs_buf_log_item->bli_flags;
+			if ($flags & 0x2) {
+				printf("xfs_buf_log_item has dirty flag set; kstack = %s\n",
+						kstack());
+			}
+
+			delete(@track_buf_item_relse[$xfs_buf]);
+		}
+	}
+}
+
+

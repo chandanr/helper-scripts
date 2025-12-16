@@ -1,0 +1,33 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_inode_item_precommit
+{
+	@track_xfs_trans_bjoin[tid] = 1;
+	@track_xfs_buf_item_relse[tid] = 1;
+}
+
+fexit:xfs_inode_item_precommit
+{
+	delete(@track_xfs_trans_bjoin[tid]);
+	delete(@track_xfs_buf_item_relse[tid]);
+}
+
+/*
+ * fentry:_xfs_trans_bjoin
+ * {
+ * 	if (@track_xfs_trans_bjoin[tid] == 1) {
+ * 		printf("comm = %s; kstack = %s\n", comm, kstack());
+ * 	}
+ * }
+ */
+
+fentry:xfs_buf_item_relse
+{
+	$xfs_buf = args.bp;
+	$xfs_buf_log_item = $xfs_buf->b_log_item;
+	$refcount = $xfs_buf_log_item->bli_refcount.counter;
+
+	if (($refcount == 0) && (@track_xfs_buf_item_relse[tid] == 1)) {
+		printf("comm = %s; kstack = %s\n", comm, kstack());
+	}
+}

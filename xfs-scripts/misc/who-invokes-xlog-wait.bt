@@ -1,0 +1,7 @@
+#!/usr/bin/bpftrace
+
+
+fentry:xlog_wait
+{
+	@xlog_wait_callers[kstack()] = count();
+}
