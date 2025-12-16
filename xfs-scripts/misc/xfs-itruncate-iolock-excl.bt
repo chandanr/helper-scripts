@@ -1,0 +1,24 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_inactive_truncate
+{
+	@inactivation_in_progress[tid] = 1;
+}
+
+fexit:xfs_inactive_truncate
+{
+	delete(@inactivation_in_progress[tid]);
+}
+
+fentry:xfs_itruncate_extents_flags
+{
+	$xfs_inode = args.ip;
+	$vfs_inode = $xfs_inode->i_vnode;
+	$i_count = $vfs_inode.i_count.counter;
+
+	if ((@inactivation_in_progress[tid] == 1) &&
+	    ($i_count != 0)) {
+		printf("xfs_itruncate_extents_flags: i_count = %lu; kstack = %s\n",
+				$i_count, kstack());
+	}
+}

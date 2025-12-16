@@ -1,0 +1,47 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_trans_dirty_buf
+{
+	$bno = args.bp->b_maps->bm_bn;
+	@xbf_done_bnos[$bno] = 1;
+}
+
+tracepoint:xfs:xfs_buf_free
+{
+	$bno = args.bno;
+
+	delete(@xbf_done_bnos[$bno]);
+}
+
+tracepoint:xfs:xfs_buf_read
+{
+	$bno = args.bno;
+	$xbf_done = 1 << 5;
+
+	if (@xbf_done_bnos[$bno] == 1) {
+		printf("bno = %lu; Possibly skipping reading an updated xfs_buf; done = %d\n",
+			$bno, args.flags & $xbf_done ? 1 : 0);
+	}
+}
+
+/*
+ * tracepoint:xfs:xfs_buf_submit
+ * {
+ * 	$xbf_write = 1 << 1;
+ * 	$xbf_done = 1 << 5;
+ * 	$bno = args.bno;
+ * 	$flags = args.flags;
+ * 
+ * 	if ((@xbf_done_bnos[$bno] == 1) && ($flags & $xbf_write)
+ * 	    && ($flags & $xbf_done)) {
+ * 		delete(@xbf_done_bnos[$bno]);
+ * 		printf("bno = %lu; XBF_DONE is set; kstack = %s\n",
+ * 				args.bno, kstack());
+ * 	}
+ * }
+ */
+
+END
+{
+	clear(@xbf_done_bnos);
+}

@@ -1,0 +1,7 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_trans_read_buf_map
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	printf("comm = %s; kstack = %s\n", comm, kstack());
+}

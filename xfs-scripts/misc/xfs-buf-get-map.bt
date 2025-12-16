@@ -1,0 +1,18 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_trans_read_buf_map
+{
+	@in_trans_read_buf_map[tid] = 1;
+}
+
+fexit:xfs_trans_read_buf_map
+{
+	delete(@in_trans_read_buf_map[tid]);
+}
+
+fentry:xfs_buf_get_map
+/ @in_trans_read_buf_map[tid] != 1 /
+{
+	printf("xfs_buf_get_map: comm = %s; kstack = %s\n", comm, kstack());
+}
+

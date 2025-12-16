@@ -1,0 +1,15 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_trans_dirty_buf
+{
+	$xfs_buf = args.bp;
+	$xfs_buf_bno = $xfs_buf->b_maps->bm_bn;
+	@track_bno_io_completion[$xfs_buf_bno] = 1;
+}
+
+tracepoint:xfs:xfs_buf_ioend
+{
+	$bno = args.bno;
+
+	if (@track_bno_io_completion[$bno] == 1) {
+		

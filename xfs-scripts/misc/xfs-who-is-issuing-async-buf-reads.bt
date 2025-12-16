@@ -1,0 +1,29 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_btree_increment,
+fentry:xfs_btree_decrement
+{
+	@in_inc_dec_ctx[tid] = 1;
+}
+
+fexit:xfs_btree_increment,
+fexit:xfs_btree_decrement
+{
+	delete(@in_inc_dec_ctx[tid]);
+}
+
+fentry:_xfs_buf_read
+{
+	$flags = args.flags;
+	$xbf_async = 1 << 4;
+
+	if (($flags & $xbf_async) &&
+	    (@in_inc_dec_ctx[tid] != 1)) {
+		@xfs_buf_async_read[kstack()] = count();
+	}
+}
+
+END
+{
+	clear(@in_inc_dec_ctx);
+}

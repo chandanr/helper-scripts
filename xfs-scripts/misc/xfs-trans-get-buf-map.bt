@@ -1,0 +1,18 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_da_get_buf
+{
+	@track_xfs_trans_get_buf_map[tid] = 1;
+}
+
+fexit:xfs_da_get_buf
+{
+	delete(@track_xfs_trans_get_buf_map[tid]);
+}
+
+fentry:xfs_trans_get_buf_map
+{
+	if (@track_xfs_trans_get_buf_map[tid] == 1) {
+		printf("comm = %s; kstack = %s\n", comm, kstack());
+	}
+}

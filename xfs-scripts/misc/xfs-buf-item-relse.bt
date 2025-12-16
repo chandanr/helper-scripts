@@ -1,0 +1,60 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_buf_item_relse
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	$xfs_buf = args.bp;
+	$bno = $xfs_buf->b_maps->bm_bn;
+
+	$bli_refcount = $xfs_buf->b_log_item->bli_refcount.counter;
+	printf("xfs_buf_item_relse: comm = %s; bno = %lu; refcount = %lu; kstack = %s\n",
+			comm, $bno, $bli_refcount, kstack());
+}
+
+tracepoint:xfs:xfs_trans_brelse
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	$bno = args.buf_bno;
+	$pincount = args.buf_pincount;
+	$refcount = args.bli_refcount;
+
+	printf("xfs_trans_brelse: comm = %s; bno = %lu; pincount = %lu; refcount = %lu; kstack = %s\n",
+				comm, $bno, $pincount, $refcount, kstack());
+}
+
+tracepoint:xfs:xfs_buf_item_pin
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	$bno = args.buf_bno;
+	$pincount = args.buf_pincount;
+	$refcount = args.bli_refcount;
+
+	printf("Pin: comm = %s; bno = %lu; pincount = %lu; refcount = %lu; kstack = %s\n",
+			comm, $bno, $pincount, $refcount, kstack());
+}
+
+tracepoint:xfs:xfs_buf_item_unpin
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	$bno = args.buf_bno;
+	$pincount = args.buf_pincount;
+	$refcount = args.bli_refcount;
+
+	printf("Unpin: comm = %s; bno = %lu; pincount = %lu; refcount = %lu; kstack = %s\n",
+			comm, $bno, $pincount, $refcount, kstack());
+}
+
+fentry:_xfs_trans_bjoin
+{
+	$xfs_buf = args.bp;
+	$bno = $xfs_buf->b_maps->bm_bn;
+	$b_log_item = $xfs_buf->b_log_item;
+
+	$refcount = 1;
+	if ($b_log_item != 0) {
+		$refcount = $b_log_item->bli_refcount.counter + 1;
+	}
+
+	printf("Bjoin: comm = %s; bno = %lu; refcount = %lu; kstack = %s\n",
+			comm, $bno, $refcount, kstack());
+}

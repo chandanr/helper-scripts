@@ -1,0 +1,11 @@
+#!/usr/bin/bpftrace
+
+fentry:xfs_rw_bdev
+{
+	$op = args.op;
+
+	if (($op != 0) && ($op != 1)) {
+		printf("comm = %s; kstack = %s\n",
+				comm, kstack());
+	}
+}

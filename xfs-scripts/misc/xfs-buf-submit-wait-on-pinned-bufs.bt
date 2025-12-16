@@ -1,0 +1,80 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_buf_delwri_submit_nowait
+{
+	@in_submit_nowait_ctx[tid] = 1;
+}
+
+fexit:xfs_buf_delwri_submit_nowait
+{
+	delete(@in_submit_nowait_ctx[tid]);
+}
+
+fentry:xfs_log_mount
+{
+	@in_log_mount_ctx[tid] = 1;
+}
+
+fexit:xfs_log_mount
+{
+	delete(@in_log_mount_ctx[tid]);
+}
+
+/* Ignore quotacheck */
+fentry:xfs_qm_quotacheck
+{
+	@in_qm_quotacheck[tid] = 1;
+}
+
+fexit:xfs_qm_quotacheck
+{
+	delete(@in_qm_quotacheck[tid]);
+}
+
+/* Ignore quota shrink */
+fentry:xfs_qm_shrink_scan
+{
+	@in_qm_shrink_scan[tid] = 1;
+}
+
+fexit:xfs_qm_shrink_scan
+{
+	delete(@in_qm_shrink_scan[tid]);
+}
+
+/* Ignore attr set */
+fentry:xfs_attr_set_iter
+{
+	@in_attr_set_iter[tid] = 1;
+}
+
+fexit:xfs_attr_set_iter
+{
+	delete(@in_attr_set_iter[tid]);
+}
+
+/* Ignore attr set */
+fentry:xfs_growfs_data
+{
+	@in_growfs_data[tid] = 1;
+}
+
+fexit:xfs_growfs_data
+{
+	delete(@in_growfs_data[tid]);
+}
+
+tracepoint:xfs:xfs_buf_submit
+{
+	$xbf_write = 1 << 1;
+
+	if ((@in_submit_nowait_ctx[tid] == 0) &&
+	    (@in_log_mount_ctx[tid] == 0) &&
+	    (@in_qm_quotacheck[tid] == 0) &&
+	    (@in_qm_shrink_scan[tid] == 0) &&
+	    (@in_attr_set_iter[tid] == 0) &&
+	    (@in_growfs_data[tid] == 0) &&
+	    (args.flags & $xbf_write)) {
+		printf("comm = %s; kstack = %s\n", comm, kstack());
+	}
+}

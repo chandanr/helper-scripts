@@ -1,0 +1,27 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_file_buffered_write
+{
+	@print_inode_log[tid] = 1;
+}
+
+fexit:xfs_file_buffered_write
+{
+	delete(@print_inode_log[tid]);
+}
+
+fentry:xfs_trans_log_inode
+{
+	if (@print_inode_log[tid] == 1) {
+		printf("xfs_trans_log_inode: comm = %s; kstack = %s\n",
+				comm, kstack());
+	}
+}
+
+tracepoint:xfs:xfs_update_time
+{
+	if (@print_inode_log[tid] == 1) {
+		printf("xfs_update_time: comm = %s; kstack = %s\n",
+				comm, kstack());
+	}
+}

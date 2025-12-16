@@ -1,0 +1,28 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:xfs:xfs_buf_submit
+/ comm != "mount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	@in_xfs_buf_submit_ctx[args.bno] = 1;
+}
+
+
+tracepoint:xfs:xfs_buf_rele
+{
+	$xbf_write = 1 << 1;
+	$xbf_async = 1 << 4;
+	$bno = args.bno;
+
+	if ((@in_xfs_buf_submit_ctx[$bno] == 1) &&
+	    (args.flags & ($xbf_write|$xbf_async)) &&
+	    (args.hold <= 2)) {
+		printf("comm = %s; tid = %lu; hold = %lu; kstack = %s\n",
+				comm, tid, args.hold, kstack());
+		delete(@in_xfs_buf_submit_ctx[$bno])
+	}
+}
+
+END
+{
+	clear(@in_xfs_buf_submit_ctx);
+}

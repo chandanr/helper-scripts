@@ -1,0 +1,15 @@
+#!/usr/bin/bpftrace
+
+interval:s:30
+{
+	exit();
+}
+
+fentry:__xfs_buf_submit
+{
+	if (args.bp->b_sema.count == 0) {
+		@nr_xfs_buf_locked = count();
+	} else {
+		@nr_xfs_buf_unlocked = count();
+	}
+}

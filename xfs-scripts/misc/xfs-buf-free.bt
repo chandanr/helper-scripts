@@ -1,0 +1,22 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_buf_item_unpin
+{
+	@in_buf_item_unpin_ctx[tid] = 1;
+}
+
+fexit:xfs_buf_item_unpin
+{
+	delete(@in_buf_item_unpin_ctx[tid]);
+}
+
+tracepoint:xfs:xfs_buf_free
+/ @in_buf_item_unpin_ctx[tid] == 1 /
+{
+	printf("comm = %s; kstack = %s\n", comm, kstack());
+}
+
+END
+{
+	clear(@in_buf_item_unpin_ctx);
+}

@@ -1,0 +1,47 @@
+#!/usr/bin/env bpftrace
+
+fentry:xfs_inodegc_worker,
+fentry:xfs_bulkstat,
+fentry:xfs_map_blocks
+{
+	@ignore_call[tid] = 1;
+}
+
+fexit:xfs_inodegc_worker,
+fexit:xfs_bulkstat,
+fexit:xfs_map_blocks
+{
+	delete(@ignore_call[tid]);
+}
+
+fentry:xfs_ilock
+/ comm != "mount" && comm != "umount" && comm != "xfs_scrub" && comm != "xfs_spaceman" /
+{
+	$lock_flags = args.lock_flags;
+	$ip = args.ip;
+
+	/* ILOCK */
+	if (($lock_flags & 0xc) &&
+	    (@ignore_call[tid] == 0)) {
+		$counter = $ip->i_vnode.i_rwsem.count.counter;
+		/*
+		 * if ($counter == 0) {
+		 * 	printf("ilock obtained *without* obtaining iolock; comm = %s; kstack = %s\n",
+		 * 			comm, kstack());
+		 * }
+		 */
+		
+		if ($counter > 0) {
+			printf("ilock obtained *after* obtaining iolock; comm = %s; kstack = %s\n",
+					comm, kstack());
+			/*
+			 * exit();
+			 */
+		}
+	}
+}
+
+END
+{
+	clear(@ignore_call);
+}
